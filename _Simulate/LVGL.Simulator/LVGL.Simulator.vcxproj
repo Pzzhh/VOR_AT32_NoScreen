@@ -1,0 +1,109 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="Mile.Project.Windows.Legacy\Mile.Project.Platform.Win32.props" />
+  <Import Project="Mile.Project.Windows.Legacy\Mile.Project.Platform.x64.props" />
+  <Import Project="Mile.Project.Windows.Legacy\Mile.Project.Platform.ARM64.props" />
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{3CA6E070-4AC1-475E-BB17-CF29AE4806DF}</ProjectGuid>
+    <RootNamespace>LVGL</RootNamespace>
+    <MileProjectType>ConsoleApplication</MileProjectType>
+    <MileProjectManifestFile>LVGL.Simulator.manifest</MileProjectManifestFile>
+    <MileProjectEnableVCLTLSupport>true</MileProjectEnableVCLTLSupport>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)'=='Debug'">
+    <SupportLTL>false</SupportLTL>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="Mile.Project.Windows.Legacy\Mile.Project.Cpp.props" />
+  <Import Project="freetype.props" />
+  <PropertyGroup>
+    <IncludePath>$(MSBuildThisFileDirectory);$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization Condition="'$(Configuration)'=='Release'">MinSpace</Optimization>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\pzh\Desktop\github\lv_port_win_visual_studio-master;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="LVGL.Portable.vcxitems" />
+  <Import Project="LVGL.Drivers.vcxitems" />
+  <ItemGroup>
+    <ClInclude Include="..\..\INTERFACE\UI\control\control_Hardware_API.h" />
+    <ClInclude Include="..\..\commuication\host_control_protocol.h" />
+    <ClInclude Include="control_type.h" />
+    <ClInclude Include="lv_conf.h" />
+    <ClInclude Include="serial\serialPort.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="lv_drv_conf.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="LVGL.Simulator.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Mile.Project.Properties.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\commuication\BLUETOOTH\BlueTooth.c" />
+    <ClCompile Include="..\..\commuication\communication.c" />
+    <ClCompile Include="..\..\commuication\communication_API.c" />
+    <ClCompile Include="..\..\commuication\host_control_protocol.c" />
+    <ClCompile Include="..\..\commuication\mpu\jy60.c" />
+    <ClCompile Include="..\..\commuication\rk3588_uart.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_base.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_CONT.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_Hardware_API.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_OVAR.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_TC.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_VHIT.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_VOR.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_ZERO.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\task_control.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\other\list.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\other\meassage_center.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\other\system_function.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\Task\task_manager.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\Task\task_stroage.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_Btn.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_Dropdown.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_KeyBorad.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_ListBox.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_SpinBox.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\page1.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\PageManagment.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\Page_Maintain.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\Page_Outage_Event.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\Page_Varify.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_Cont.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_Ovar.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_Set.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_TC.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_VHIT.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_Vor.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\varify\verfiy.c" />
+    <ClCompile Include="GUI\arrow_rotate_right.c" />
+    <ClCompile Include="GUI\GUI_BackGround.c" />
+    <ClCompile Include="LVGL.Simulator.cpp" />
+    <ClCompile Include="serial\serialPort.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="LVGL.Simulator.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="LVGL.ico" />
+  </ItemGroup>
+  <Import Project="Mile.Project.Windows.Legacy\Mile.Project.Cpp.targets" />
+</Project>

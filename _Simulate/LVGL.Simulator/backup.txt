@@ -1,0 +1,197 @@
+﻿#include "UI_ListBox.h"
+#include "list.h"
+
+typedef struct {
+    uint8_t index;
+    custom_table_struct Tables[10];
+    List* list;
+    lv_obj_t* parent;
+}UI_List_struct;
+
+
+
+typedef struct
+{
+    lv_obj_t* obj;
+    int32_t set_pos;
+    int32_t pos_y;
+    uint8_t* ID;
+}custom_table_struct;
+
+
+const uint16_t index = 10;
+//custom_table_struct Tables[10];
+lv_obj_t* table_box;
+
+void btn_handler(lv_event_t* e)
+{
+    static int i = 0;
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED)
+    {
+        /*   lv_obj_del(Tables[i++].obj);
+           lv_obj_invalidate(table_box);*/
+    }
+}
+
+static void anim_end_cb(lv_anim_t* a) {
+    lv_obj_del((lv_obj_t*)a->var);
+}
+
+// 创建并移除表格对象的动画
+void create_and_remove_table_with_animation() {
+    // 初始化 LittlevGL 库
+    lv_init();
+
+    // 创建一个屏幕对象
+    lv_obj_t* scr = lv_scr_act();
+
+    // 创建一个容器对象
+    lv_obj_t* table_box = lv_obj_create(scr);
+    lv_obj_set_size(table_box, 400, 300);
+    lv_obj_align(table_box, LV_ALIGN_CENTER, 150, 0);
+    lv_obj_set_layout(table_box, LV_LAYOUT_GRID);
+
+    // 创建一个表格对象
+    lv_obj_t* table = lv_table_create(table_box);
+    lv_obj_set_size(table, 300, 200);
+    lv_obj_align(table, LV_ALIGN_CENTER, 0, 0);
+
+    // 设置表格内容
+    lv_table_set_col_width(table, 0, 80);
+    lv_table_set_cell_value(table, 0, 0, "Row 1");
+    lv_table_set_cell_value(table, 1, 0, "Row 2");
+
+    // 创建一个透明度动画
+    //lv_anim_t a;
+    //lv_anim_init(&a);
+    //lv_anim_set_var(&a, table);
+    //lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_TRANSP); // 从完全不透明到透明
+    //lv_anim_set_time(&a, 1000); // 动画持续时间为 1000 毫秒
+    //lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_style_opa); // 设置执行回调函数
+    //lv_anim_set_path_cb(&a, lv_anim_path_ease_in); // 设置动画路径
+    //lv_anim_set_ready_cb(&a, anim_end_cb); // 设置动画结束回调函数
+    //lv_anim_start(&a); // 开始动画
+}
+static void anim_y_cb(void* var, int32_t v) {
+    lv_obj_set_y((lv_obj_t*)var, v);
+}
+
+static void Tabels_Touch_handler(lv_event_t* e)
+{
+    Node* pt = e->user_data;
+    
+    lv_event_code_t code = e->code;
+    lv_obj_t* obj = e->current_target;
+    if (code == LV_EVENT_CLICKED)
+    {
+        ins-> = ins->ID;
+    }
+    if (ins->instant->index == ins->ID)
+    {
+        lv_style_t* style = obj->styles->style;
+        lv_style_set_outline_width(style, 2);
+        lv_style_set_outline_color(style, lv_palette_main(LV_PALETTE_BLUE));
+        lv_style_set_outline_pad(style, 3);
+
+    }
+}
+
+// 自定义动画路径函数，例如 y = t^2
+static int32_t custom_anim_path(const lv_anim_t* a) {
+    custom_table_struct* table = a->user_data;
+    table->pos_y += (table->set_pos - table->pos_y) * 0.05;
+    //lv_group_focus_obj(table->obj);
+    return  table->pos_y;
+}
+
+
+void UI_ListBox_Create(UI_List_struct* e)
+{
+#if 01
+#define TABLE_COUNT  10
+    lv_obj_t* table_box = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(table_box, 400, 300);
+    lv_obj_align(table_box, LV_ALIGN_CENTER, 150, 0);
+
+    for (int i = 0;i < 10;i++)
+    {
+        e->Tables[i].obj = lv_table_create(table_box);
+        lv_obj_set_height(e->Tables[i].obj, 50);
+        lv_table_set_col_width(e->Tables[i].obj, 0, 80);
+        for (int k = 1; k < 4; k++)
+            lv_table_set_col_width(e->Tables[i].obj, k, 90);
+        //lv_obj_add_flag( e->Tables[i].obj, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(e->Tables[i].obj, LV_OBJ_FLAG_CLICK_FOCUSABLE);
+        lv_obj_clear_flag(e->Tables[i].obj, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_radius(e->Tables[i].obj, 10, NULL);
+        //lv_obj_align(e->Tables[i].obj, LV_ALIGN_DEFAULT, 0, i * 55);
+        static lv_style_t style;
+        lv_style_init(&style);
+        lv_obj_add_style(e->Tables[i].obj, &style, 0);
+
+        e->Tables[i].set_pos = i * 65 + 20;
+        lv_anim_t a;
+        lv_anim_init(&a);
+        a.user_data = &e->Tables[i];
+        lv_anim_set_var(&a, e->Tables[i].obj);
+        //lv_anim_set_values(&a, 0, 200); // y值从0到200
+        //lv_anim_set_time(&a, 2000); // 动画时间为2000毫秒
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_set_exec_cb(&a, anim_y_cb); // 设置执行回调函数
+        lv_anim_set_path_cb(&a, custom_anim_path); // 设置自定义路径回调函数
+        lv_anim_start(&a); // 开始动画
+        e->Tables[i].touch.ID = i;
+        lv_obj_add_event_cb(e->Tables[i].obj, Tabels_Touch_handler, LV_EVENT_ALL, &e);
+    }
+    // 创建一个屏幕对象
+
+#endif
+
+}
+
+UI_List_struct* UI_ListBox_Create2()
+{
+    static  UI_List_struct ins;
+    List_init(ins.list);
+    ins.list->_free = lv_mem_free;
+    ins.list->_malloc = lv_mem_alloc;
+    lv_obj_t* table_box = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(table_box, 400, 300);
+    lv_obj_align(table_box, LV_ALIGN_CENTER, 150, 0);
+    ins.parent = table_box;
+    return &ins;
+}
+void UI_ListBox_item_Create_function(lv_obj_t* obj)
+{
+    lv_obj_set_height(obj, 50);
+    lv_table_set_col_width(obj, 0, 80);
+    for (int k = 1; k < 4; k++)
+        lv_table_set_col_width(obj, k, 90);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_radius(obj, 10, NULL);
+    //lv_obj_align(obj, LV_ALIGN_DEFAULT, 0, i * 55);
+    static lv_style_t style;
+    lv_style_init(&style);
+    lv_obj_add_style(obj, &style, 0);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    a.user_data = obj;
+    lv_anim_set_var(&a, obj);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a, anim_y_cb); // 设置执行回调函数
+    lv_anim_set_path_cb(&a, custom_anim_path); // 设置自定义路径回调函数
+    lv_anim_start(&a); // 开始动画
+    lv_obj_add_event_cb(obj, Tabels_Touch_handler, LV_EVENT_ALL, 0);
+}
+void (*ui_custom_table)(lv_obj_t* obj) = UI_ListBox_item_Create_function;
+
+void UI_ListBox_item_Create(UI_List_struct* e)
+{
+    custom_table_struct* table = lv_mem_alloc(sizeof(custom_table_struct));
+    Node* newnode = add(e->list, table);
+    table->obj = lv_table_create(e->parent);
+    ui_custom_table(table->obj);
+    table->obj->user_data = newnode;
+}

@@ -1,0 +1,188 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="LVGL.Portable.vcxitems.filters" />
+  <Import Project="LVGL.Drivers.vcxitems.filters" />
+  <ItemGroup>
+    <ClInclude Include="lv_conf.h" />
+    <ClInclude Include="lv_drv_conf.h" />
+    <ClInclude Include="..\..\INTERFACE\UI\control\control_Hardware_API.h">
+      <Filter>UI\control</Filter>
+    </ClInclude>
+    <ClInclude Include="control_type.h">
+      <Filter>UI\control</Filter>
+    </ClInclude>
+    <ClInclude Include="serial\serialPort.h">
+      <Filter>UI\commuication</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="LVGL.Simulator.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Mile.Project.Properties.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="LVGL.Simulator.cpp" />
+    <ClCompile Include="GUI\GUI_BackGround.c" />
+    <ClCompile Include="GUI\arrow_rotate_right.c" />
+    <ClCompile Include="..\..\INTERFACE\UI\control\control.c">
+      <Filter>UI\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\Task\task_stroage.c">
+      <Filter>UI\Task</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_Btn.c">
+      <Filter>UI\UI_Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_Dropdown.c">
+      <Filter>UI\UI_Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_ListBox.c">
+      <Filter>UI\UI_Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_SpinBox.c">
+      <Filter>UI\UI_Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\other\list.c">
+      <Filter>UI\other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_Cont.c">
+      <Filter>UI\UI_Parameter</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_Set.c">
+      <Filter>UI\UI_Parameter</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_Vor.c">
+      <Filter>UI\UI_Parameter</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\page1.c">
+      <Filter>UI\UI_page</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\other\system_function.c">
+      <Filter>UI\other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\task_control.c">
+      <Filter>UI\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_Hardware_API.c">
+      <Filter>UI\control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_VOR.c">
+      <Filter>UI\control\mode</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_CONT.c">
+      <Filter>UI\control\mode</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\commuication\communication_API.c">
+      <Filter>UI\commuication</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\commuication\mpu\jy60.c">
+      <Filter>UI\commuication\mpu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\other\meassage_center.c">
+      <Filter>UI\other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\Task\task_manager.c">
+      <Filter>UI\Task</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\commuication\communication.c">
+      <Filter>UI\commuication</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\commuication\BLUETOOTH\BlueTooth.c">
+      <Filter>UI\commuication\BL</Filter>
+    </ClCompile>
+    <ClCompile Include="serial\serialPort.c">
+      <Filter>UI\commuication</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_OVAR.c">
+      <Filter>UI\control\mode</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_Ovar.c">
+      <Filter>UI\UI_Parameter</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\PageManagment.c">
+      <Filter>UI\UI_page</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\Page_Maintain.c">
+      <Filter>UI\UI_page</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\commuication\rk3588_uart.c">
+      <Filter>UI\commuication</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_TC.c">
+      <Filter>UI\UI_Parameter</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Parameter\UI_Parameter_VHIT.c">
+      <Filter>UI\UI_Parameter</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_TC.c">
+      <Filter>UI\control\mode</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_VHIT.c">
+      <Filter>UI\control\mode</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_base.c">
+      <Filter>UI\control\mode</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\control\control_ZERO.c">
+      <Filter>UI\control\mode</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\varify\verfiy.c">
+      <Filter>UI\verfiy</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\Page_Varify.c">
+      <Filter>UI\UI_page</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_Component\UI_KeyBorad.c">
+      <Filter>UI\UI_Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\INTERFACE\UI\UI_page\Page_Outage_Event.c">
+      <Filter>UI\UI_page</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="LVGL.Simulator.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="LVGL.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="UI">
+      <UniqueIdentifier>{bf706d65-1890-496a-ad62-574b73646650}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\control">
+      <UniqueIdentifier>{9ae648c9-5249-49be-a179-25c7b1a4819c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\Task">
+      <UniqueIdentifier>{19d15730-5746-41bd-a1d4-d2671f1defb0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\UI_Component">
+      <UniqueIdentifier>{f501baba-3634-4487-bedd-3d5b7fa41486}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\UI_page">
+      <UniqueIdentifier>{d13a36ca-c5a8-4665-bace-640ed3c5c159}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\UI_Parameter">
+      <UniqueIdentifier>{91ee996c-a809-4aed-b981-6b7055271817}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\other">
+      <UniqueIdentifier>{29618644-a56b-4926-9331-6d7d631aa5d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\control\mode">
+      <UniqueIdentifier>{2bafa99e-02c8-4e5f-a6fc-e160b1b981ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\commuication">
+      <UniqueIdentifier>{fc9beddd-8673-4c00-ab76-874ac9f96574}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\commuication\mpu">
+      <UniqueIdentifier>{a1115f72-cb4b-42ef-b99c-d8c859253fea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\commuication\BL">
+      <UniqueIdentifier>{cbcd70ef-7d14-45b3-9208-73eb121c44bc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI\verfiy">
+      <UniqueIdentifier>{2c30e069-05c5-41a5-9a9c-a60632848adc}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

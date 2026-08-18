@@ -1,0 +1,96 @@
+/*
+ * @Author: pzzhh2 101804901+Pzzhh@users.noreply.github.com
+ * @Date: 2025-09-11 15:50:16
+ * @LastEditors: pzzhh2 101804901+Pzzhh@users.noreply.github.com
+ * @LastEditTime: 2025-10-10 11:39:54
+ * @FilePath: \VOR_V3.0_AT32\INTERFACE\LVGL\lvgl\src\hal\lv_hal_tick.c
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
+/**
+ * @file lv_hal_tick.c
+ * Provide access to the system tick with 1 millisecond resolution
+ */
+
+/*********************
+ *      INCLUDES
+ *********************/
+#include "lv_hal_tick.h"
+#include <stddef.h>
+
+#if LV_TICK_CUSTOM == 1
+    #include LV_TICK_CUSTOM_INCLUDE
+#endif
+
+/*********************
+ *      DEFINES
+ *********************/
+
+/**********************
+ *      TYPEDEFS
+ **********************/
+
+/**********************
+ *  STATIC PROTOTYPES
+ **********************/
+
+/**********************
+ *  STATIC VARIABLES
+ **********************/
+#if !LV_TICK_CUSTOM
+    static uint32_t sys_time = 0;
+    static volatile uint8_t tick_irq_flag;
+#endif
+
+/**********************
+ *      MACROS
+ **********************/
+
+/**********************
+ *   GLOBAL FUNCTIONS
+ **********************/
+
+#if !LV_TICK_CUSTOM
+/**
+ * You have to call this function periodically
+ * @param tick_period the call period of this function in milliseconds
+ */
+LV_ATTRIBUTE_TICK_INC void lv_tick_inc(uint32_t tick_period)
+{
+    tick_irq_flag = 0;
+    sys_time += tick_period;
+}
+#endif
+#include "../UI/other/system_function.h"
+/**
+ * Get the elapsed milliseconds since start up
+ * @return the elapsed milliseconds
+ */
+uint32_t lv_tick_get(void)
+{
+    return ControlGetTick();
+}
+
+/**
+ * Get the elapsed milliseconds since a previous time stamp
+ * @param prev_tick a previous time stamp (return value of lv_tick_get() )
+ * @return the elapsed milliseconds since 'prev_tick'
+ */
+uint32_t lv_tick_elaps(uint32_t prev_tick)
+{
+    uint32_t act_time = lv_tick_get();
+
+    /*If there is no overflow in sys_time simple subtract*/
+    if(act_time >= prev_tick) {
+        prev_tick = act_time - prev_tick;
+    }
+    else {
+        prev_tick = UINT32_MAX - prev_tick + 1;
+        prev_tick += act_time;
+    }
+
+    return prev_tick;
+}
+
+/**********************
+ *   STATIC FUNCTIONS
+ **********************/

@@ -1,0 +1,67 @@
+# This repository uses a source allowlist: ignore unknown/generated files by
+# default, then explicitly keep source, project and documentation files.
+*
+!*/
+!.gitignore
+!**/.gitignore
+
+# Source and scripts
+!*.c
+!*.cc
+!*.cpp
+!*.h
+!*.hpp
+!*.s
+!*.S
+!*.sh
+!*.py
+
+# Build and IDE project definitions (not generated build output)
+!CMakeLists.txt
+!*.cmake
+!*.sln
+!*.vcxproj
+!*.vcxitems
+!*.filters
+!*.props
+!*.targets
+!*.manifest
+!*.rc
+!*.ico
+!*.uvoptx
+!*.uvprojx
+!*.Administrator
+
+# Documentation and configuration intended for source control
+!*.txt
+!*.md
+!*.json
+!*.yaml
+!*.yml
+
+# Generated build trees and IDE state
+**/build-linux/
+**/build/
+**/cmake-build-*/
+**/CMakeFiles/
+**/.vs/
+**/.vscode/
+**/.idea/
+
+# Compiler, linker and platform artifacts
+**/*.o
+**/*.obj
+**/*.a
+**/*.so
+**/*.dll
+**/*.exe
+**/*.pdb
+**/*.ilk
+**/*.user
+**/*.suo
+**/*.log
+**/.DS_Store
+
+# Simulator runtime persistence files
+**/Task.hex
+**/config.hex
