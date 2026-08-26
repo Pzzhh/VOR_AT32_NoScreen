@@ -1,30 +1,24 @@
-﻿/*
- * @Author: pzzhh2 101804901+Pzzhh@users.noreply.github.com.
- * @Date: 2024-07-22 16:00:07
- * @LastEditors: pzzhh2 101804901+Pzzhh@users.noreply.github.com.
- * @LastEditTime: 2024-07-30 15:43:59
- * @FilePath: \USERd:\workfile\项目3 vor\software\TC_V2.0\INTERFACE\UI\control\control_TC.h
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
-/*
- * @Author: pzzhh2 101804901+Pzzhh@users.noreply.github.com.
- * @Date: 2024-07-22 16:00:07
- * @LastEditors: pzzhh2 101804901+Pzzhh@users.noreply.github.com.
- * @LastEditTime: 2024-07-26 16:49:39
- * @FilePath: \USERd:\workfile\项目3 vor\software\TC_V2.0\INTERFACE\UI\control\control_TC.h
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
-#ifndef  __control_TC_H_
-#define __control_TC_H_
+#ifndef __CONTROL_VOR_H_
+#define __CONTROL_VOR_H_
+
 #include "stdint.h"
 #include "control.h"
+#include "control_base.h"
+
 #ifdef __cplusplus
-extern "C"
-{
-#endif //
-	uint8_t TcControlFunction(Task_Parameter_Struct *task, Task_control_info *e);
+extern "C" {
+#endif
+
+uint8_t HAL_Slave_VOR_Init(Task_Parameter_Struct *task);
+uint8_t HAL_Slave_VOR_Stop(void);
+uint8_t HAL_Slave_VOR_Pause(uint8_t enable);
+uint8_t HAL_Slave_VOR_Get_State(uint32_t *remaining_count, uint32_t *percent);
+const char *ModeStr(Task_Parameter_Struct *task);
+uint16_t VorControlFunction(Task_Parameter_Struct *task, Task_control_info *control);
+const Control_Driver *VOR_Get_Driver(void);
+
 #ifdef __cplusplus
 }
-#endif // 
+#endif
 
-#endif // 
+#endif

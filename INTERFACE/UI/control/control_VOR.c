@@ -1,197 +1,125 @@
-/*
- * @Author: pzzhh2 101804901+Pzzhh@users.noreply.github.com.
- * @Date: 2024-07-22 16:00:07
- * @LastEditors: pzzhh2 101804901+Pzzhh@users.noreply.github.com
- * @LastEditTime: 2025-04-25 10:00:23
- * @FilePath: \USERd:\workfile\È°πÁõÆ3 vor\software\VOR_V2.0\INTERFACE\UI\control\control_VOR.c
- * @Description: ËøôÊòØÈªòË?§Ë?æÁΩÆ,ËØ∑Ë?æÁΩÆ`customMade`, ÊâìÂºÄkoroFileHeaderÊü•ÁúãÈÖçÁΩÆ ËøõË?åË?æÁΩÆ: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
 #include "control_VOR.h"
 #include "control_Hardware_API.h"
+#include "control_base.h"
 #include "../other/system_function.h"
 #include "control.h"
 #include "stdint.h"
-#include "task_control.h"
-#define use_windows
+
 #ifndef ATM32F43_xx
 #include "Windows.h"
 #include <stdio.h>
 #else
 #include "../implement/Slave_Vor_Ctrl.h"
-#endif // use_windows
- // Êó†UIÊéßÂà∂
-// ËøîÂõûmessage
+#endif
 
-struct
-{
-	uint32_t time;
-	uint32_t RemainTime;
-	uint8_t flag_pause;
-	uint32_t SetCount;
-	float Vel;
-	float Freq;
+static struct {
+    uint32_t time;
+    uint32_t RemainTime;
+    uint8_t flag_pause;
+    uint32_t SetCount;
+    float Vel;
+    float Freq;
 } vor_info;
 
-uint8_t HAL_Slave_VOR_Init(Task_Parameter_Struct* e)
+uint8_t HAL_Slave_VOR_Init(Task_Parameter_Struct *task)
 {
 #ifndef ATM32F43_xx
-	vor_info.time = ControlGetTick();
-	vor_info.Freq = e->VOR.Freq;
-	vor_info.SetCount = e->VOR.Counter;
-	vor_info.flag_pause = 0;
+    vor_info.time = ControlGetTick();
+    vor_info.Freq = task->VOR.Freq;
+    vor_info.SetCount = task->VOR.Counter;
+    vor_info.flag_pause = 0;
 #else
-	if (e->mode == Task_VOR)
-		VOR_Machine_Init(e->VOR.Freq, e->VOR.Vel, e->VOR.Counter, e->VOR.ExMode);
-#endif // !ATM32F43_xx
-
-	return 1;
+    if (task->mode == Task_VOR)
+        VOR_Machine_Init(task->VOR.Freq, task->VOR.Vel,
+                         task->VOR.Counter, task->VOR.ExMode);
+#endif
+    return 1;
 }
 
 uint8_t HAL_Slave_VOR_Stop(void)
 {
 #ifndef ATM32F43_xx
-	uint32_t currentCount = vor_info.Freq * (ControlGetTick() - vor_info.time) / 1000.0f;
-	vor_info.SetCount = currentCount + 1;
-	vor_info.flag_pause = 0;
+    uint32_t current_count =
+        vor_info.Freq * (ControlGetTick() - vor_info.time) / 1000.0f;
+    vor_info.SetCount = current_count + 1;
+    vor_info.flag_pause = 0;
 #else
-	VOR_Machine_Stop();
-#endif // !ATM32F43_xx
-	return 1;
+    VOR_Machine_Stop();
+#endif
+    return 1;
 }
 
 uint8_t HAL_Slave_VOR_Pause(uint8_t enable)
 {
 #ifndef ATM32F43_xx
-	if (enable)
-	{
-		vor_info.flag_pause = 1;
-		vor_info.RemainTime = ControlGetTick() - vor_info.time;
-	}
-	else
-	{
-		vor_info.time = ControlGetTick() - vor_info.RemainTime;
-		vor_info.flag_pause = 0;
-	}
+    if (enable) {
+        vor_info.flag_pause = 1;
+        vor_info.RemainTime = ControlGetTick() - vor_info.time;
+    } else {
+        vor_info.time = ControlGetTick() - vor_info.RemainTime;
+        vor_info.flag_pause = 0;
+    }
 #else
-	VOR_Machine_Pause();
-#endif // !ATM32F43_xx
-	return 1;
+    VOR_Machine_Pause();
+#endif
+    return 1;
 }
 
-uint8_t HAL_Slave_VOR_Get_State(uint32_t* remainingCount, uint32_t* parcent)
+uint8_t HAL_Slave_VOR_Get_State(uint32_t *remaining_count, uint32_t *percent)
 {
 #ifndef ATM32F43_xx
-	if (vor_info.flag_pause)
-		return Imp_paused;
-	uint32_t currentCount = vor_info.Freq * (ControlGetTick() - vor_info.time) / 1000.0f;
-	if (parcent != 0)
-		*parcent = currentCount * 100 / vor_info.SetCount;
-	if (currentCount < vor_info.SetCount)
-	{
-		*remainingCount = vor_info.SetCount - currentCount;
-		return Imp_running;
-	}
-	*remainingCount = 0;
-	return Imp_finsih;
+    uint32_t current_count;
+    if (vor_info.flag_pause)
+        return Imp_paused;
+    current_count =
+        vor_info.Freq * (ControlGetTick() - vor_info.time) / 1000.0f;
+    if (percent != 0)
+        *percent = current_count * 100 / vor_info.SetCount;
+    if (current_count < vor_info.SetCount) {
+        *remaining_count = vor_info.SetCount - current_count;
+        return Imp_running;
+    }
+    *remaining_count = 0;
+    return Imp_finsih;
 #else
-	uint32_t counterReq = 0, CurrentCount = 0;
-	uint8_t res = VOR_Machine_Get_Count(&counterReq, &CurrentCount);
-	if (parcent != 0 && counterReq != 0)
-		*parcent = CurrentCount * 100 / counterReq;
-	*remainingCount = counterReq - CurrentCount;
-	return res;
-#endif // !ATM32F43_xx
+    uint32_t counter_req = 0;
+    uint32_t current_count = 0;
+    uint8_t result = VOR_Machine_Get_Count(&counter_req, &current_count);
+    if (percent != 0 && counter_req != 0)
+        *percent = current_count * 100 / counter_req;
+    *remaining_count = counter_req - current_count;
+    return result;
+#endif
 }
 
-const char* ModeStr(Task_Parameter_Struct* task)
+const char *ModeStr(Task_Parameter_Struct *task)
 {
-	static const char str[][10] = { "VOR", "OKR", "VOR+OKR","VOR+OKR*" };
-	return str[task->VOR.ExMode];
+    static const char names[][10] = {"VOR", "OKR", "VOR+OKR", "VOR+OKR*"};
+    return names[task->VOR.ExMode];
 }
 
-uint8_t VorControlFunction(Task_Parameter_Struct* task, Task_control_info* e)
+static const char *VOR_Driver_Name(const Task_Parameter_Struct *task)
 {
-	const int camWaitTime_s = 5;
-	MYPRINTF("\r\n vor begin");
-	MYPRINTF("\r\n");
-	// ÊâßË?åÈÉ®Âà?
-	MYPRINTF("\r\n");
-Pause_Resume:
-	e->UI_para.state = taskinit;
-	Rk3588_Send_Task_Array(e);
-	Task_Delay_Msg("Rec After %d", 5);
-	uint8_t CAM_State = HAL_CAM_REC_Set(1);
-	Task_Delay_Msg("Run After %d", 10);
-	/*motor set running configure*/
-	HAL_Slave_VOR_Init(task);
-	/*notice control thread current state*/
-	e->UI_para.state = taskruning;
-	/*get vor machine flag*/
-	uint8_t VOR_machine_flag = 1, CamIsStop = 0;
-	int32_t LastCount = -1;
-	uint32_t count, parcent;
-	e->State_Bit.reqPause = 0;
-	e->UI_para.state=taskruning;
-	/*waiting vor machine finish*/
-	while (VOR_machine_flag)
-	{
-		VOR_machine_flag = HAL_Slave_VOR_Get_State(&count, &parcent);
-		if (LastCount != count && VOR_machine_flag == Imp_running)
-		{
-			Ctrl_Msg_Printf("%d:%s Done:%d%%", e->currentCount + 1, ModeStr(task), parcent);
-			LastCount = count;
-		}
-		if (e->State_Bit.Exit&&e->UI_para.state != taskTerminal) // for exit
-		{
-			Ctrl_Msg_Printf("%d:%s #A52A2A Terminated#", e->currentCount + 1, ModeStr(task));
-			e->State_Bit.isPause = 0;
-			e->UI_para.state = taskTerminal;
-			HAL_Slave_VOR_Stop();
-		}
-		if (e->State_Bit.reqPause == 1)
-		{
-			e->State_Bit.reqPause = 0;
-			if (VOR_machine_flag == Imp_running)
-			{
-				HAL_Slave_VOR_Pause(1);
-				Ctrl_Msg_Printf("%d:%s Pause", e->currentCount + 1, ModeStr(task));
-				e->State_Bit.isPause = 1;
-				Rk3588_Send_Pause;
-				e->UI_para.state = taskPause;
-				// if (CamIsStop == 0)
-				// 	HAL_CAM_REC_Set(1);
-				// CamIsStop = 1;
-				HAL_CAM_REC_Set(0);
-			}
-			else if (VOR_machine_flag == Imp_paused)
-			{
-				//e->UI_para.state = taskruning;
-				e->State_Bit.isPause = 0;
-				Task_Delay_Msg("Resume After %d", 5);
-				goto Pause_Resume;
-				//Ctrl_Msg_Printf("%d:%s Done:%d%%", e->currentCount, ModeStr(task), parcent);
-				//HAL_Slave_VOR_Pause(0);
-				//HAL_CAM_REC_Set(1);
-			}
-		}
-		MYPRINTF("%3d", count);
-		// wait motor infinsh
-		SaftExitDelay(50, 0);
+    return ModeStr((Task_Parameter_Struct *)task);
+}
 
-		MYPRINTF("\r");
-	}
-	if (e->State_Bit.Exit == 0)
-		Ctrl_Msg_Printf("%d:%s Done:100%%", e->currentCount + 1, ModeStr(task));
-	/*one sec for cam stop*/
-	SaftExitDelay(1000, 0);
-	if (CamIsStop == 0)
-		CAM_State = HAL_CAM_REC_Set(0);
-	if (CAM_State == 0)
-	{
-		Ctrl_Msg_Printf("CAM ERROR");
-	}
-	/*--one sec for cam stop*/
-	MYPRINTF("\r\n vor end");
-	e->UI_para.state = taskend;
-	return 0;
+static const Control_Driver VOR_Driver = {
+    .name = VOR_Driver_Name,
+    .start = HAL_Slave_VOR_Init,
+    .pause = HAL_Slave_VOR_Pause,
+    .get_state = HAL_Slave_VOR_Get_State,
+    .stop = HAL_Slave_VOR_Stop,
+    .next = 0,
+    .on_tick = 0,
+    .poll_interval_ms = 50
+};
+
+const Control_Driver *VOR_Get_Driver(void)
+{
+    return &VOR_Driver;
+}
+
+uint16_t VorControlFunction(Task_Parameter_Struct *task, Task_control_info *control)
+{
+    return (uint16_t)Control_Run(task, control, &VOR_Driver);
 }

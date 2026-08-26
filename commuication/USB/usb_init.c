@@ -274,6 +274,34 @@ uint8_t USB_CDC_Send(uint8_t CH, uint8_t *buf, uint16_t len)
 		return 0;
 }
 
+uint8_t USB_CDC_Send_Force(uint8_t CH, uint8_t *buf, uint16_t len)
+{
+    if(!USB_init_flag || buf == NULL || len == 0 || len > USBD_CDC_IN_MAXPACKET_SIZE)
+        return ERROR;
+    if(CH == 1)
+        return usb_vcp_send_data_force(&otg_core_struct.dev, buf, len);
+    return ERROR;
+}
+
+uint8_t USB_CDC_Tx_Completed(uint8_t CH)
+{
+    if(!USB_init_flag || CH != 1)
+        return 0;
+    return usb_vcp_tx_completed(&otg_core_struct.dev);
+}
+
+uint8_t USB_CDC_Rx_Completed(uint8_t CH)
+{
+    if(!USB_init_flag || CH != 1)
+        return 0;
+    return usb_vcp_rx_completed(&otg_core_struct.dev);
+}
+
+uint8_t USB_CDC_Is_Initialized(void)
+{
+    return USB_init_flag ? 1U : 0U;
+}
+
 uint16_t USB_CDC_GET(uint8_t CH, uint8_t *buf)
 {
     if(!USB_init_flag)

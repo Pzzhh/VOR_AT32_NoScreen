@@ -1,4 +1,6 @@
 #include "communication_API.h"
+#include "usb_vor_control.h"
+#include "../INTERFACE/UI/other/system_function.h"
 #include "stdarg.h"
 #include "stdio.h"
 #include "string.h"
@@ -8,7 +10,9 @@
 #ifdef ATM32F43_xx
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 #include "control/control.h"
+#include "USB/usb_init.h"
 #define USE_USB 1
 #define USE_BL 1
 #else
@@ -16,6 +20,7 @@
 #define USE_BL 1
 #ifdef use_linux
 #include "linux_serial.h"
+#include <pthread.h>
 static int linux_usb_port = -1;
 static uint16_t USB_init_flag = 0;
 #else
@@ -54,17 +59,17 @@ static uint16_t USB_init_flag = 0;
 
 extern Task_control_info control_info;
 
-// ÃüÁî´°¿Ú ÐèÒªÏß³Ì
+// ï¿½ï¿½ï¿½î´°ï¿½ï¿½ ï¿½ï¿½Òªï¿½ß³ï¿½
 
 // log print
 
 // oriange pie
 
-// ble Òª¿ªÏß³ÌÍ¨ÐÅ
+// ble Òªï¿½ï¿½ï¿½ß³ï¿½Í¨ï¿½ï¿½
 
 void HAL_communication_Bl_Init(void)
 {
-	// ´®¿Ú init
+	// ï¿½ï¿½ï¿½ï¿½ init
 }
 
 // yj-60 init
@@ -162,9 +167,12 @@ uint8_t HAL_USB_INIT()
 int HAL_USB_Isconnect()
 {
 #if USE_USB
-// extern	vu8 bDeviceState;
+	return USB_CDC_Is_Initialized();
+#elif defined(use_linux)
+	return LinuxSerial_IsOpen(linux_usb_port) ? 1 : 0;
+#else
+	return 0;
 #endif
-	// return bDeviceState;
 }
 
 uint8_t HAL_USB_TX(uint8_t *str, uint16_t len)
@@ -178,10 +186,223 @@ uint8_t HAL_USB_TX(uint8_t *str, uint16_t len)
 }
 
 // ========== USB ACM Implementation ==========
+#if defined(ATM32F43_xx) || defined(use_linux)
+#define USB_ACM_POOL_SIZE 256U
+#define USB_ACM_PACKET_SIZE 64U
+#define USB_ACM_TX_POLL_MS 2U
+#define USB_ACM_TX_TIMEOUT_MS 10U
+#define USB_ACM_RX_POLL_MS 10U
+
 #ifdef ATM32F43_xx
-extern uint8_t USB_CDC_Send(uint8_t CH, uint8_t *buf, uint16_t len);
-extern uint16_t USB_CDC_GET(uint8_t CH, uint8_t *buf);
-extern uint16_t USB_init_flag;
+typedef SemaphoreHandle_t USB_ACM_Mutex;
+#else
+typedef pthread_mutex_t USB_ACM_Mutex;
+#endif
+
+typedef struct
+{
+	uint8_t data[USB_ACM_POOL_SIZE];
+	uint16_t head;
+	uint16_t tail;
+	uint16_t count;
+	uint32_t last_push_tick;
+	USB_ACM_Mutex mutex;
+} USB_ACM_Byte_Pool;
+
+static USB_ACM_Byte_Pool usb_tx_pool;
+static USB_ACM_Byte_Pool usb_rx_pool;
+static uint8_t usb_acm_pool_ready = 0;
+#ifdef ATM32F43_xx
+static TaskHandle_t usb_acm_thread_handles[2];
+#define USB_ACM_THREAD_RETURN void
+#else
+static pthread_t usb_acm_thread_handles[2];
+#define USB_ACM_THREAD_RETURN void *
+#endif
+
+static uint8_t usb_acm_mutex_init(USB_ACM_Mutex *mutex)
+{
+#ifdef ATM32F43_xx
+	*mutex = xSemaphoreCreateMutex();
+	return *mutex != NULL;
+#else
+	return pthread_mutex_init(mutex, NULL) == 0;
+#endif
+}
+
+static void usb_acm_mutex_lock(USB_ACM_Mutex *mutex)
+{
+#ifdef ATM32F43_xx
+	(void)xSemaphoreTake(*mutex, portMAX_DELAY);
+#else
+	(void)pthread_mutex_lock(mutex);
+#endif
+}
+
+static void usb_acm_mutex_unlock(USB_ACM_Mutex *mutex)
+{
+#ifdef ATM32F43_xx
+	(void)xSemaphoreGive(*mutex);
+#else
+	(void)pthread_mutex_unlock(mutex);
+#endif
+}
+
+static void usb_acm_pool_copy_in(USB_ACM_Byte_Pool *pool,
+								 const uint8_t *data, uint16_t len)
+{
+	uint16_t first = len;
+	if(first > (uint16_t)(USB_ACM_POOL_SIZE - pool->head))
+		first = (uint16_t)(USB_ACM_POOL_SIZE - pool->head);
+	memcpy(&pool->data[pool->head], data, first);
+	if(len > first)
+		memcpy(pool->data, data + first, (uint16_t)(len - first));
+	pool->head = (uint16_t)((pool->head + len) % USB_ACM_POOL_SIZE);
+	pool->count = (uint16_t)(pool->count + len);
+}
+
+static uint16_t usb_acm_pool_copy_out(USB_ACM_Byte_Pool *pool,
+								  uint8_t *data, uint16_t max_len)
+{
+	uint16_t len = pool->count < max_len ? pool->count : max_len;
+	uint16_t first = len;
+	if(first > (uint16_t)(USB_ACM_POOL_SIZE - pool->tail))
+		first = (uint16_t)(USB_ACM_POOL_SIZE - pool->tail);
+	memcpy(data, &pool->data[pool->tail], first);
+	if(len > first)
+		memcpy(data + first, pool->data, (uint16_t)(len - first));
+	pool->tail = (uint16_t)((pool->tail + len) % USB_ACM_POOL_SIZE);
+	pool->count = (uint16_t)(pool->count - len);
+	return len;
+}
+
+static uint8_t usb_acm_pool_try_push(USB_ACM_Byte_Pool *pool,
+								 const uint8_t *data, uint16_t len,
+								 uint8_t update_tx_tick)
+{
+	uint8_t pushed = 0;
+	usb_acm_mutex_lock(&pool->mutex);
+	if(len <= (uint16_t)(USB_ACM_POOL_SIZE - pool->count))
+	{
+		usb_acm_pool_copy_in(pool, data, len);
+		if(update_tx_tick)
+			pool->last_push_tick = ControlGetTick();
+		pushed = 1;
+	}
+	usb_acm_mutex_unlock(&pool->mutex);
+	return pushed;
+}
+
+static uint16_t usb_acm_rx_pop(uint8_t *data, uint16_t max_len)
+{
+	uint16_t len;
+	usb_acm_mutex_lock(&usb_rx_pool.mutex);
+	len = usb_acm_pool_copy_out(&usb_rx_pool, data, max_len);
+	usb_acm_mutex_unlock(&usb_rx_pool.mutex);
+	return len;
+}
+
+static uint16_t usb_acm_tx_pop_ready(uint8_t *data, uint32_t now)
+{
+	uint16_t len = 0;
+	usb_acm_mutex_lock(&usb_tx_pool.mutex);
+	if(usb_tx_pool.count >= USB_ACM_PACKET_SIZE ||
+	   (usb_tx_pool.count > 0 &&
+		(uint32_t)(now - usb_tx_pool.last_push_tick) >= USB_ACM_TX_TIMEOUT_MS))
+	{
+		len = usb_acm_pool_copy_out(&usb_tx_pool, data, USB_ACM_PACKET_SIZE);
+	}
+	usb_acm_mutex_unlock(&usb_tx_pool.mutex);
+	return len;
+}
+
+static uint8_t usb_acm_physical_send(uint8_t *data, uint16_t len, uint8_t force)
+{
+	if(data == NULL || len == 0 || len > USB_ACM_PACKET_SIZE)
+		return 0;
+#ifdef ATM32F43_xx
+	if(!USB_CDC_Is_Initialized())
+		return 0;
+	return ((force ? USB_CDC_Send_Force(1, data, len)
+				   : USB_CDC_Send(1, data, len)) == 0U) ? 1 : 0;
+#else
+	(void)force;
+	return LinuxSerial_Write(linux_usb_port, data, len) ? 1 : 0;
+#endif
+}
+
+static uint16_t usb_acm_physical_read(uint8_t *data)
+{
+#ifdef ATM32F43_xx
+	if(!USB_CDC_Is_Initialized() || !USB_CDC_Rx_Completed(1))
+		return 0;
+	return USB_CDC_GET(1, data);
+#else
+	if(!USB_init_flag)
+		return 0;
+	return (uint16_t)LinuxSerial_Read(linux_usb_port, data, USB_ACM_PACKET_SIZE);
+#endif
+}
+
+static USB_ACM_THREAD_RETURN usb_acm_tx_thread(void *argument)
+{
+	uint8_t packet[USB_ACM_PACKET_SIZE];
+#ifdef ATM32F43_xx
+	uint32_t wait_start = ControlGetTick();
+#endif
+	(void)argument;
+	for(;;)
+	{
+		uint32_t now = ControlGetTick();
+#ifdef ATM32F43_xx
+		uint8_t completed = USB_CDC_Tx_Completed(1);
+		uint8_t force = (!completed &&
+			(uint32_t)(now - wait_start) >= USB_ACM_TX_TIMEOUT_MS) ? 1U : 0U;
+		if(completed || force)
+		{
+			uint16_t len = usb_acm_tx_pop_ready(packet, now);
+			if(len > 0)
+			{
+				(void)usb_acm_physical_send(packet, len, force);
+				wait_start = now;
+			}
+			else if(completed)
+			{
+				wait_start = now;
+			}
+		}
+		ControlDelay(USB_ACM_TX_POLL_MS);
+#else
+		uint16_t len = usb_acm_tx_pop_ready(packet, now);
+		if(len > 0)
+			(void)usb_acm_physical_send(packet, len, 0);
+		else
+			ControlDelay(1);
+#endif
+	}
+#ifndef ATM32F43_xx
+	return NULL;
+#endif
+}
+
+static USB_ACM_THREAD_RETURN usb_acm_rx_thread(void *argument)
+{
+	uint8_t packet[USB_ACM_PACKET_SIZE];
+	uint16_t pending_len = 0;
+	(void)argument;
+	for(;;)
+	{
+		if(pending_len == 0)
+			pending_len = usb_acm_physical_read(packet);
+		if(pending_len > 0 &&
+		   usb_acm_pool_try_push(&usb_rx_pool, packet, pending_len, 0))
+			pending_len = 0;
+		ControlDelay(USB_ACM_RX_POLL_MS);
+	}
+#ifndef ATM32F43_xx
+	return NULL;
+#endif
+}
 #endif
 
 /**
@@ -190,16 +411,49 @@ extern uint16_t USB_init_flag;
  */
 uint8_t HAL_USB_ACM_Init(void)
 {
+#if defined(ATM32F43_xx) || defined(use_linux)
+	if(usb_acm_pool_ready)
+		return 1;
+#endif
 #ifdef ATM32F43_xx
 	extern void USB1_Init(void);
 	USB1_Init();
-	return 1;
 #elif defined(use_linux)
 	linux_usb_port = LinuxSerial_Open("/tmp/ttyUSB", 115200, NULL);
 	USB_init_flag = LinuxSerial_IsOpen(linux_usb_port) ? 1 : 0;
-	return USB_init_flag;
+	if(!USB_init_flag)
+		return 0;
 #else
 	return 0;
+#endif
+#if defined(ATM32F43_xx) || defined(use_linux)
+	memset(&usb_tx_pool, 0, sizeof(usb_tx_pool));
+	memset(&usb_rx_pool, 0, sizeof(usb_rx_pool));
+	if(!usb_acm_mutex_init(&usb_tx_pool.mutex) ||
+	   !usb_acm_mutex_init(&usb_rx_pool.mutex))
+		return 0;
+	#ifdef ATM32F43_xx
+	if(xTaskCreate(usb_acm_tx_thread, "usb_tx", 256, NULL, 11,
+				   &usb_acm_thread_handles[0]) != pdPASS)
+		return 0;
+	if(xTaskCreate(usb_acm_rx_thread, "usb_rx", 256, NULL, 11,
+				   &usb_acm_thread_handles[1]) != pdPASS)
+	{
+		vTaskDelete(usb_acm_thread_handles[0]);
+		return 0;
+	}
+	#else
+	if(pthread_create(&usb_acm_thread_handles[0], NULL,
+				  usb_acm_tx_thread, NULL) != 0)
+		return 0;
+	if(pthread_create(&usb_acm_thread_handles[1], NULL,
+				  usb_acm_rx_thread, NULL) != 0)
+		return 0;
+	(void)pthread_detach(usb_acm_thread_handles[0]);
+	(void)pthread_detach(usb_acm_thread_handles[1]);
+	#endif
+	usb_acm_pool_ready = 1;
+	return 1;
 #endif
 }
 
@@ -211,12 +465,12 @@ uint8_t HAL_USB_ACM_Init(void)
  */
 uint8_t HAL_USB_ACM_Send(uint8_t *data, uint16_t len)
 {
-#ifdef ATM32F43_xx
-	if (!USB_init_flag)
+#if defined(ATM32F43_xx) || defined(use_linux)
+	if(!usb_acm_pool_ready || data == NULL || len == 0 || len > USB_ACM_POOL_SIZE)
 		return 0;
-	return (USB_CDC_Send(1, data, len) == 0) ? 1 : 0;
-#elif defined(use_linux)
-	return LinuxSerial_Write(linux_usb_port, data, len) ? 1 : 0;
+	while(!usb_acm_pool_try_push(&usb_tx_pool, data, len, 1))
+		ControlDelay(10);
+	return 1;
 #else
 	return 0;
 #endif
@@ -230,13 +484,10 @@ uint8_t HAL_USB_ACM_Send(uint8_t *data, uint16_t len)
  */
 uint16_t HAL_USB_ACM_Read(uint8_t *buffer, uint16_t maxlen)
 {
-#ifdef ATM32F43_xx
-	if (!USB_init_flag || buffer == NULL)
+#if defined(ATM32F43_xx) || defined(use_linux)
+	if(!usb_acm_pool_ready || buffer == NULL || maxlen == 0)
 		return 0;
-	return USB_CDC_GET(1, buffer);
-#elif defined(use_linux)
-	if(!USB_init_flag || buffer == NULL) return 0;
-	return (uint16_t)LinuxSerial_Read(linux_usb_port, buffer, maxlen);
+	return usb_acm_rx_pop(buffer, maxlen);
 #else
 	return 0;
 #endif
@@ -249,9 +500,9 @@ uint16_t HAL_USB_ACM_Read(uint8_t *buffer, uint16_t maxlen)
 uint8_t HAL_USB_ACM_IsReady(void)
 {
 #ifdef ATM32F43_xx
-	return USB_init_flag;
+	return usb_acm_pool_ready && USB_CDC_Is_Initialized();
 #elif defined(use_linux)
-	return LinuxSerial_IsOpen(linux_usb_port) ? 1 : 0;
+	return usb_acm_pool_ready && LinuxSerial_IsOpen(linux_usb_port);
 #else
 	return 0;
 #endif
@@ -267,7 +518,7 @@ uint8_t HAL_USB_ACM_IsReady(void)
 void HAL_USB_Log_Printf(const char *format, ...)
 {
 #if defined(ATM32F43_xx) || defined(use_linux)
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 	char log_buffer[256];
@@ -399,7 +650,7 @@ static void Task_Info_ToString(void *task_ptr, char *buffer, uint16_t bufsize)
 void HAL_USB_Log_Task_Operation(const char *operation, uint16_t index, const char *details)
 {
 #ifdef ATM32F43_xx
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 	if (details != NULL && details[0] != '\0')
@@ -422,7 +673,7 @@ void HAL_USB_Log_Task_Operation(const char *operation, uint16_t index, const cha
 void HAL_USB_Log_Task_Detail(const char *operation, uint16_t index, void *task)
 {
 #ifdef ATM32F43_xx
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 	if (task != NULL)
@@ -441,7 +692,7 @@ void HAL_USB_Log_Task_Detail(const char *operation, uint16_t index, void *task)
 void HAL_USB_Log_Task_Detail_all()
 {
 #ifdef ATM32F43_xx
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 
@@ -471,7 +722,7 @@ void HAL_USB_Log_Task_Detail_all()
  */
 void HAL_USB_Heap_Analysis(void)
 {
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 	HAL_USB_Log_Printf("\r\n========== FreeRTOS Heap (malloc) Analysis ==========\r\n");
@@ -555,7 +806,7 @@ void HAL_USB_Heap_Analysis(void)
  */
 void HAL_USB_Stack_Analysis(void)
 {
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 	HAL_USB_Log_Printf("\r\n========== Task Stack Analysis ==========\r\n");
@@ -646,7 +897,7 @@ void HAL_USB_Stack_Analysis(void)
  */
 void HAL_USB_Memory_Full_Check(void)
 {
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 	HAL_USB_Log_Printf("\r\n================================================\r\n");
@@ -673,7 +924,7 @@ void HAL_USB_Memory_Full_Check(void)
  */
 void HAL_USB_Task_Priority_Diagnosis(void)
 {
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 	UBaseType_t uxArraySize = uxTaskGetNumberOfTasks();
@@ -776,7 +1027,7 @@ void HAL_USB_Task_Priority_Diagnosis(void)
  */
 void HAL_USB_LVGL_Memory_Analysis(void)
 {
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
 
 	lv_mem_monitor_t mon;
@@ -824,7 +1075,9 @@ void HAL_USB_LVGL_Memory_Analysis(void)
  */
 void HAL_USB_Command_Process(const char *cmd)
 {
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
+		return;
+	if (USB_VOR_Command_Process(cmd))
 		return;
 
 	// Remove trailing whitespace and newline
@@ -887,52 +1140,42 @@ void HAL_USB_Command_Process(const char *cmd)
 }
 
 // USB command buffer and state
-static uint8_t usb_rx_buffer[64];
-static uint8_t usb_cmd_buffer[64];
+static uint8_t usb_rx_buffer[128];
+static uint8_t usb_cmd_buffer[128];
 static uint8_t usb_cmd_idx = 0;
+static uint8_t usb_cmd_overflow = 0;
 
-/**
- * @brief USB command polling handler - call this in main loop
- * Receives characters from USB and processes complete commands
- */
 void HAL_USB_Command_Handler(void)
 {
-	if (!USB_init_flag)
+	if (!HAL_USB_ACM_IsReady())
 		return;
-
-	uint16_t rx_len = HAL_USB_ACM_Read(usb_rx_buffer, sizeof(usb_rx_buffer) - 1);
-	if (rx_len > 0)
+	uint16_t rx_len = HAL_USB_ACM_Read(usb_rx_buffer, sizeof(usb_rx_buffer));
+	for (uint16_t i = 0; i < rx_len; i++)
 	{
-		for (uint16_t i = 0; i < rx_len; i++)
+		uint8_t ch = usb_rx_buffer[i];
+		if (ch == '\r' || ch == '\n')
 		{
-			uint8_t ch = usb_rx_buffer[i];
-
-			// Echo character (optional - uncomment if needed)
-			// HAL_USB_ACM_Send(&ch, 1);
-
-			if (ch == '\r' || ch == '\n')
+			if (usb_cmd_overflow)
 			{
-				if (usb_cmd_idx > 0)
-				{
-					usb_cmd_buffer[usb_cmd_idx] = '\0';
-					HAL_USB_Command_Process((char *)usb_cmd_buffer);
-					usb_cmd_idx = 0;
-				}
+				USB_VOR_Report_Line_Too_Long();
+				usb_cmd_overflow = 0;
+				usb_cmd_idx = 0;
 			}
-			else if (ch == 0x08 || ch == 0x7F) // Backspace or Delete
+			else if (usb_cmd_idx > 0)
 			{
-				if (usb_cmd_idx > 0)
-				{
-					usb_cmd_idx--;
-				}
+				usb_cmd_buffer[usb_cmd_idx] = '\0';
+				HAL_USB_Command_Process((char *)usb_cmd_buffer);
+				usb_cmd_idx = 0;
 			}
-			else if (ch >= 0x20 && ch < 0x7F) // Printable characters
-			{
-				if (usb_cmd_idx < sizeof(usb_cmd_buffer) - 1)
-				{
-					usb_cmd_buffer[usb_cmd_idx++] = ch;
-				}
-			}
+		}
+		else if ((ch == 0x08 || ch == 0x7F) && usb_cmd_idx > 0)
+			usb_cmd_idx--;
+		else if (ch >= 0x20 && ch < 0x7F)
+		{
+			if (usb_cmd_idx < sizeof(usb_cmd_buffer) - 1)
+				usb_cmd_buffer[usb_cmd_idx++] = ch;
+			else
+				usb_cmd_overflow = 1;
 		}
 	}
 }
@@ -941,30 +1184,50 @@ void HAL_USB_Command_Handler(void)
 #ifdef use_linux
 void HAL_USB_Command_Process(const char *cmd)
 {
-	if(!USB_init_flag || cmd == NULL) return;
-	if(strcmp(cmd, "help") == 0)
+	if (!USB_init_flag || cmd == NULL)
+		return;
+	if (USB_VOR_Command_Process(cmd))
+		return;
+	if (strcmp(cmd, "help") == 0)
 		HAL_USB_Log_Printf("Linux USB ACM is ready. MCU-only diagnostics are unavailable.\r\n");
-	else if(cmd[0] != '\0')
+	else if (cmd[0] != '\0')
 		HAL_USB_Log_Printf("Linux USB command received: %s\r\n", cmd);
 }
 
 void HAL_USB_Command_Handler(void)
 {
-	static uint8_t command[64];
+	static uint8_t command[128];
 	static uint8_t index = 0;
-	uint8_t received[64];
+	static uint8_t overflow = 0;
+	uint8_t received[128];
 	uint16_t count = HAL_USB_ACM_Read(received, sizeof(received));
-	for(uint16_t i = 0; i < count; ++i) {
+	for (uint16_t i = 0; i < count; ++i)
+	{
 		uint8_t ch = received[i];
-		if(ch == '\r' || ch == '\n') {
-			if(index > 0) {
+		if (ch == '\r' || ch == '\n')
+		{
+			if (overflow)
+			{
+				USB_VOR_Report_Line_Too_Long();
+				overflow = 0;
+				index = 0;
+			}
+			else if (index > 0)
+			{
 				command[index] = '\0';
 				HAL_USB_Command_Process((char *)command);
 				index = 0;
 			}
 		}
-		else if((ch == 0x08 || ch == 0x7f) && index > 0) --index;
-		else if(ch >= 0x20 && ch < 0x7f && index < sizeof(command) - 1) command[index++] = ch;
+		else if ((ch == 0x08 || ch == 0x7f) && index > 0)
+			index--;
+		else if (ch >= 0x20 && ch < 0x7f)
+		{
+			if (index < sizeof(command) - 1)
+				command[index++] = ch;
+			else
+				overflow = 1;
+		}
 	}
 }
 #endif

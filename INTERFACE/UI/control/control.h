@@ -30,6 +30,12 @@ extern "C"
 		taskend,
 		taskInv,
 	} task_runing;
+	typedef enum
+	{
+		CONTROL_OWNER_NONE = 0,
+		CONTROL_OWNER_UI,
+		CONTROL_OWNER_USB
+	} Control_Owner;
 	typedef struct
 	{
 		union
@@ -116,6 +122,7 @@ extern "C"
 		uint16_t taskParcentage;
 		uint8_t isExpired;
 		uint8_t StartWithIndex;
+		volatile Control_Owner controlOwner;
 #ifdef ATM32F43_xx
 
 #endif // ATM32F43_xx

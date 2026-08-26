@@ -9,6 +9,7 @@
 #include "communication.h"
 #include "../INTERFACE/UI/other/system_function.h"
 #include "communication_API.h"
+#include "usb_vor_control.h"
 
 
 extern void jump_to_bootloader(void);
@@ -26,6 +27,7 @@ void communication_thread()
 #if defined(ATM32F43_xx) || defined(use_linux)
 		// USB√¸¡Ó¥¶¿Ì
 		HAL_USB_Command_Handler();
+		USB_VOR_Communication_Poll();
 #endif
 		ControlDelay(10);
 	}

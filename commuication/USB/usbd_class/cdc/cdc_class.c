@@ -386,6 +386,36 @@ error_status usb_vcp_send_data(void *udev, uint8_t *send_data, uint16_t len)
   return status;
 }
 
+error_status usb_vcp_send_data_force(void *udev, uint8_t *send_data, uint16_t len)
+{
+  usbd_core_type *pudev = (usbd_core_type *)udev;
+  cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
+
+  if(send_data == NULL || len == 0 || len > USBD_CDC_IN_MAXPACKET_SIZE)
+  {
+    return ERROR;
+  }
+
+  /* The USB peripheral owns the bytes after they enter its FIFO. */
+  pcdc->g_tx_completed = 0;
+  usbd_ept_send(pudev, USBD_CDC_BULK_IN_EPT, send_data, len);
+  return SUCCESS;
+}
+
+uint8_t usb_vcp_tx_completed(void *udev)
+{
+  usbd_core_type *pudev = (usbd_core_type *)udev;
+  cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
+  return pcdc->g_tx_completed;
+}
+
+uint8_t usb_vcp_rx_completed(void *udev)
+{
+  usbd_core_type *pudev = (usbd_core_type *)udev;
+  cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
+  return pcdc->g_rx_completed;
+}
+
 /**
   * @brief  usb device function
   * @param  udev: to the structure of usbd_core_type

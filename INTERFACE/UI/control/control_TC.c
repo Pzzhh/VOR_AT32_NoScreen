@@ -3,8 +3,8 @@
  * @Date: 2024-07-22 16:00:07
  * @LastEditors: pzzhh2 101804901+Pzzhh@users.noreply.github.com
  * @LastEditTime: 2025-02-06 16:47:30
- * @FilePath: \USERd:\workfile\项目3 vor\software\TC_V2.0\INTERFACE\UI\control\control_TC.c
- * @Description: 这是默�?��?�置,请�?�置`customMade`, 打开koroFileHeader查看配置 进�?��?�置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ * @FilePath: \USERd:\workfile\椤圭洰3 vor\software\TC_V2.0\INTERFACE\UI\control\control_TC.c
+ * @Description: 杩欐槸榛樿?よ?剧疆,璇疯?剧疆`customMade`, 鎵撳紑koroFileHeader鏌ョ湅閰嶇疆 杩涜?岃?剧疆: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #include "control_TC.h"
 #include "control_Hardware_API.h"
@@ -12,6 +12,7 @@
 #include "control.h"
 #include "task_control.h"
 #include "stdint.h"
+#include "control_base.h"
 #define use_windows
 #ifndef ATM32F43_xx
 #include "Windows.h"
@@ -19,8 +20,8 @@
 #else
 #include "../implement/Slave_TC_Ctrl.h"
 #endif // use_windows
- // 无UI控制
-// 返回message
+ // 鏃燯I鎺у埗
+// 杩斿洖message
 const int singalCount = 1 * 1000;
 struct
 {
@@ -100,6 +101,21 @@ uint8_t HAL_Slave_TC_Get_State(uint32_t* remainingCount, uint32_t* parcent)
 #endif // !ATM32F43_xx
 }
 
+static const char *TC_Driver_Name(const Task_Parameter_Struct *task)
+{
+	(void)task;
+	return "TC";
+}
+
+static const Control_Driver TC_Driver = {
+	.name = TC_Driver_Name, .start = HAL_Slave_TC_Init,
+	.pause = HAL_Slave_TC_Pause, .get_state = HAL_Slave_TC_Get_State,
+	.stop = HAL_Slave_TC_Stop, .next = 0, .on_tick = 0,
+	.poll_interval_ms = 50
+};
+
+const Control_Driver *TC_Get_Driver(void) { return &TC_Driver; }
+
 
 
 uint8_t TcControlFunction(Task_Parameter_Struct* task, Task_control_info* e)
@@ -107,7 +123,7 @@ uint8_t TcControlFunction(Task_Parameter_Struct* task, Task_control_info* e)
 	const int camWaitTime_s = 5;
 	MYPRINTF("\r\n vor begin");
 	MYPRINTF("\r\n");
-	// 执�?�部�?
+	// 鎵ц?岄儴鍒?
 	MYPRINTF("\r\n");
 Pause_Resume:
 	e->UI_para.state = taskinit;

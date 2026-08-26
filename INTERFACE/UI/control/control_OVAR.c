@@ -4,6 +4,7 @@
 #include "control.h"
 #include "task_control.h"
 #include "stdint.h"
+#include "control_base.h"
 #define use_windows
 #ifndef ATM32F43_xx
 uint16_t adc1_ordinary_valuetab[2];
@@ -12,8 +13,8 @@ uint16_t adc1_ordinary_valuetab[2];
 #else
 #include "../implement/Slave_OVAR_Ctrl.h"
 #endif // use_windows
-// 无UI控制
-// 返回message
+// 鏃燯I鎺у埗
+// 杩斿洖message
 extern uint16_t adc1_ordinary_valuetab[2];
 struct
 {
@@ -197,7 +198,7 @@ uint8_t OvarControlFunction(Task_Parameter_Struct *task,
 {
 	MYPRINTF("\r\n ovar begin");
 	MYPRINTF("\r\n");
-	// 执行部分
+	// 鎵ц閮ㄥ垎
 	MYPRINTF("\r\n");
 	e->UI_para.state = taskruning;
 	Inc_handle(task->OVAR.Inc_Degree);
@@ -209,3 +210,18 @@ uint8_t OvarControlFunction(Task_Parameter_Struct *task,
 	e->UI_para.state = taskend;
 	return 0;
 }
+
+static const char *OVAR_Driver_Name(const Task_Parameter_Struct *task)
+{
+	(void)task;
+	return "OVAR";
+}
+
+static const Control_Driver OVAR_Driver = {
+	.name = OVAR_Driver_Name, .start = hal_Slave_OVAR_Init,
+	.pause = HAL_Slave_OVAR_Pause, .get_state = hal_Slave_OVAR_Get_State,
+	.stop = hal_Slave_OVAR_Stop, .next = 0, .on_tick = 0,
+	.poll_interval_ms = 50
+};
+
+const Control_Driver *OVAR_Get_Driver(void) { return &OVAR_Driver; }

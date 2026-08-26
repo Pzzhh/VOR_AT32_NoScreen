@@ -1,0 +1,22 @@
+{
+  "serial": {
+    "port": "",
+    "baudrate": 115200,
+    "ack_timeout_seconds": 5.0,
+    "run_timeout_seconds": 120.0,
+    "reconnect_interval_seconds": 2.0
+  },
+  "tcp": {
+    "host": "10.211.55.6",
+    "port": 9000,
+    "connect_timeout_seconds": 3.0
+  },
+  "web": {
+    "host": "127.0.0.1",
+    "port": 8765
+  },
+  "log_limit": 1000,
+  "data_dir": "data",
+  "template_limit": 5,
+  "history_limit": 20
+}

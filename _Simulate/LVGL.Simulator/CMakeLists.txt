@@ -23,6 +23,8 @@ set(APP_SOURCES
     lv_drivers/sdl/sdl_common.c
     ../../commuication/communication.c
     ../../commuication/communication_API.c
+    ../../commuication/usb_vor_control.c
+    ../../commuication/usb_control_base.c
     ../../commuication/rk3588_uart.c
     ../../commuication/BLUETOOTH/BlueTooth.c
     ../../commuication/mpu/jy60.c

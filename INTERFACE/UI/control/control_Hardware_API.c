@@ -244,10 +244,10 @@ uint8_t HAL_IMU_GET_Angle(float *angle)
 uint8_t HAL_Encode_GET_angle(float *angle)
 {
 #ifdef ATM32F43_xx
-	extern float Slave1_Get_Encode_Angle_real(void);
+	extern float Slave1_Get_Encode_Angle(void);
 	if (angle != 0)
 	{
-		*angle = Slave1_Get_Encode_Angle_real();
+		*angle = Slave1_Get_Encode_Angle();
 	}
 #else
 	static float anglex;

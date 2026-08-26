@@ -74,6 +74,7 @@ extern "C"
 	uint8_t HAL_CAM_SET_Led_Voltage(uint16_t Millivol);
 	uint8_t HAL_Beep_Enable(uint32_t ms);
 	uint8_t HAL_IMU_GET_Angle(float* angle);
+	uint8_t HAL_Encode_GET_angle(float* angle);
 
 	// uint8_t HAL_Control_Get_Start_Cmd(Start_Cmd_Type *cmd);
 	uint8_t HAL_Set_UI_Page1_Msg(const char* format, ...);

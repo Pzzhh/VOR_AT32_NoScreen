@@ -65,3 +65,9 @@
 # Simulator runtime persistence files
 **/Task.hex
 **/config.hex
+
+# Python host runtime artifacts
+tools/mac/.venv/
+tools/mac/data/
+tools/mac/**/__pycache__/
+tools/mac/**/*.pyc

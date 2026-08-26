@@ -18,11 +18,13 @@
 #define __control_VHIT_H_
 #include "stdint.h"
 #include "control.h"
+#include "control_base.h"
 #ifdef __cplusplus
 extern "C"
 {
 #endif //
 	uint8_t VHITControlFunction(Task_Parameter_Struct *task, Task_control_info *e);
+	const Control_Driver *VHIT_Get_Driver(void);
 #ifdef __cplusplus
 }
 #endif // 

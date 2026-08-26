@@ -17,7 +17,7 @@
 #define ONE_BUFFER 1
 #define TWO_BUFFER 0
 
-#define COLOR_SIZE         (0xf000)
+#define COLOR_SIZE         (0xE000)
 
 //#define buf_1 (lv_color_t*)((u32)(0x68000000))
 /**********************

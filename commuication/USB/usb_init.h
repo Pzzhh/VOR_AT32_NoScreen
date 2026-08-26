@@ -16,5 +16,9 @@
 void USB1_Init(void);
 void usb_send(uint8_t *report, uint16_t len);
 uint8_t USB_CDC_Send(uint8_t CH, uint8_t *buf, uint16_t len);
+uint8_t USB_CDC_Send_Force(uint8_t CH, uint8_t *buf, uint16_t len);
+uint8_t USB_CDC_Tx_Completed(uint8_t CH);
+uint8_t USB_CDC_Rx_Completed(uint8_t CH);
+uint8_t USB_CDC_Is_Initialized(void);
 uint16_t USB_CDC_GET(uint8_t CH, uint8_t *buf);
 #endif

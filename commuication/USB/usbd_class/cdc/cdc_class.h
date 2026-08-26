@@ -92,6 +92,9 @@ typedef struct
 extern usbd_class_handler cdc_class_handler;
 uint16_t usb_vcp_get_rxdata(void *udev, uint8_t *recv_data);
 error_status usb_vcp_send_data(void *udev, uint8_t *send_data, uint16_t len);
+error_status usb_vcp_send_data_force(void *udev, uint8_t *send_data, uint16_t len);
+uint8_t usb_vcp_tx_completed(void *udev);
+uint8_t usb_vcp_rx_completed(void *udev);
 
 /**
   * @}

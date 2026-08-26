@@ -33,11 +33,11 @@ void TMR1_BRK_TMR9_IRQHandler(void)
         acc_angle = Slave1_Get_Encode_Angle();
         //        extern void Motor_Spd_Pid();
         //        Motor_Spd_Pid(); // avoid c601 unexpect movement
-        // ²¹Í£»ú´úÂë
+        // ï¿½ï¿½Í£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     }
     TMR9->ists = (uint16_t)~TMR_OVF_FLAG;
 }
-// µ±handler·µ»Ø1Ê±Í£Ö¹×´Ì¬»ú
+// ï¿½ï¿½handlerï¿½ï¿½ï¿½ï¿½1Ê±Í£Ö¹×´Ì¬ï¿½ï¿½
 void Slave1_Set_Machine_Cb(Slave_Function_CB cb)
 {
     Slave1_IO_Init();
@@ -111,11 +111,11 @@ void SRV1_Encoder_Init()
 void Slave_server_Init(void)
 {
 
-    CRM->apb2en_bit.tmr9en = 1; /// Ê¹ÄÜTMR9Ê±ÖÓ
+    CRM->apb2en_bit.tmr9en = 1; /// Ê¹ï¿½ï¿½TMR9Ê±ï¿½ï¿½
 
     tmr_cnt_dir_set(TMR9, TMR_COUNT_UP);
     tmr_clock_source_div_set(TMR9, TMR_CLOCK_DIV1);
-    tmr_base_init(TMR9, 999, 287); // ³õÊ¼»¯TMR9
+    tmr_base_init(TMR9, 999, 287); // ï¿½ï¿½Ê¼ï¿½ï¿½TMR9
 
     tmr_interrupt_enable(TMR9, TMR_OVF_INT, TRUE);
 
@@ -379,13 +379,13 @@ uint8_t Slave1_Check_Encode_Angle()
 float Slave1_Get_Encode_Angle()
 {
     //    if (isEncode_error)
-    {
-        return soft_angle_CNT;
-    }
+    // {
+    //     return soft_angle_CNT;
+    // }
     int32_t count = *(int32_t *)&(TMR2->cval);
     count = count - 1073741 / 2;
     float angle = count / 1073741.0f * 360.0f;
-    return angle;
+    return angle+soft_angle_CNT;
 }
 
 float Slave1_Get_Encode_Angle_real()

@@ -18,11 +18,13 @@
 #define __control_TC_H_
 #include "stdint.h"
 #include "control.h"
+#include "control_base.h"
 #ifdef __cplusplus
 extern "C"
 {
 #endif //
 	uint8_t TcControlFunction(Task_Parameter_Struct *task, Task_control_info *e);
+	const Control_Driver *TC_Get_Driver(void);
 #ifdef __cplusplus
 }
 #endif // 
