@@ -24,13 +24,14 @@ class FakeClient:
     def add_listener(self, callback):
         self.listeners.append(callback)
 
-    def command(self, action, parameters="", timeout=None):
-        self.commands.append((action, parameters))
-        return Ack(True, len(self.commands), f"VOR.{action}", 0,
+    def command(self, action, parameters="", timeout=None, mode="VOR"):
+        self.commands.append((action, parameters, mode))
+        return Ack(True, len(self.commands), f"{mode}.{action}", 0,
                    "RUNNING" if action != "Stop" else "STOPPING", "OK", "")
 
-    def emit(self, event, state="RUNNING", progress=0, remaining=0, code=0):
-        payload = Event(1, event, "VOR", state, code, progress, remaining, "")
+    def emit(self, event, state="RUNNING", progress=0, remaining=0, code=0,
+             mode="VOR"):
+        payload = Event(1, event, mode, state, code, progress, remaining, "")
         for listener in self.listeners:
             listener("protocol", payload)
 
@@ -145,5 +146,54 @@ def test_run_only_selected_task() -> None:
         assert state["tasks"][0]["state"] == "SKIPPED"
         assert state["tasks"][1]["state"] == "COMPLETED"
         assert state["tasks"][2]["state"] == "QUEUED"
+    finally:
+        scheduler.close()
+
+
+def test_ovar_runs_incline_motor_and_return_phases() -> None:
+    client = FakeClient()
+    scheduler = TaskScheduler(client)
+    try:
+        scheduler.add_task(VorTaskInput(mode="OVAR", seconds=10,
+                                        velocity=30, incline_degree=15))
+        scheduler.execute("start")
+        assert client.commands[-1] == ("Start", "A=15", "INC")
+        client.emit("COMPLETED", state="READY", progress=100, mode="INC")
+        client.emit("IDLE", state="IDLE", mode="INC")
+        scheduler.execute("status")
+        assert client.commands[-2] == ("Start", "S=10 V=30", "OVAR")
+        client.emit("COMPLETED", state="READY", progress=100, mode="OVAR")
+        client.emit("IDLE", state="IDLE", mode="OVAR")
+        scheduler.execute("status")
+        assert client.commands[-2] == ("Start", "A=0", "INC")
+        client.emit("COMPLETED", state="READY", progress=100, mode="INC")
+        client.emit("IDLE", state="IDLE", mode="INC")
+        scheduler.execute("status")
+        assert scheduler.snapshot()["state"] == "COMPLETED"
+    finally:
+        scheduler.close()
+
+
+def test_ovar_stop_returns_incline_to_zero() -> None:
+    client = FakeClient()
+    scheduler = TaskScheduler(client)
+    try:
+        scheduler.add_task(VorTaskInput(mode="OVAR", seconds=10,
+                                        velocity=30, incline_degree=15))
+        scheduler.execute("start")
+        client.emit("COMPLETED", state="READY", progress=100, mode="INC")
+        client.emit("IDLE", state="IDLE", mode="INC")
+        scheduler.execute("status")
+        scheduler.execute("stop")
+        assert client.commands[-1] == ("Stop", "", "OVAR")
+        client.emit("STOPPED", state="STOPPED", mode="OVAR")
+        client.emit("IDLE", state="IDLE", mode="OVAR")
+        scheduler.execute("status")
+        assert client.commands[-2] == ("Start", "A=0", "INC")
+        client.emit("COMPLETED", state="READY", progress=100, mode="INC")
+        client.emit("IDLE", state="IDLE", mode="INC")
+        scheduler.execute("status")
+        assert scheduler.snapshot()["state"] == "IDLE"
+        assert scheduler.snapshot()["tasks"][0]["state"] == "STOPPED"
     finally:
         scheduler.close()

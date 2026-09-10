@@ -1,5 +1,6 @@
 #include "communication_API.h"
 #include "usb_vor_control.h"
+#include "../HARDWARE/SYSTEM/sys/sys.h"
 #include "../INTERFACE/UI/other/system_function.h"
 #include "stdarg.h"
 #include "stdio.h"
@@ -1118,6 +1119,11 @@ void HAL_USB_Command_Process(const char *cmd)
 	{
 		HAL_USB_Memory_Full_Check();
 	}
+	else if (strcmp(cmd_buf, "dfu") == 0)
+	{
+		HAL_USB_Log_Printf("Entering DFU mode...\r\n");
+		RequestEnterDFU();
+	}
 	else if (strcmp(cmd_buf, "help") == 0)
 	{
 		HAL_USB_Log_Printf("\r\nAvailable Commands:\r\n");
@@ -1129,6 +1135,7 @@ void HAL_USB_Command_Process(const char *cmd)
 		HAL_USB_Log_Printf("  mem      - Full memory check (short)\r\n");
 		HAL_USB_Log_Printf("  pri      - Show task priority & state\r\n");
 		HAL_USB_Log_Printf("  tasks    - Show task priority & state\r\n");
+		HAL_USB_Log_Printf("  dfu      - Reboot into the system DFU bootloader\r\n");
 		HAL_USB_Log_Printf("  help     - Show this help message\r\n");
 		HAL_USB_Log_Printf("\r\n");
 	}

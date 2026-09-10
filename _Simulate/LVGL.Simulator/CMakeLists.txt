@@ -33,6 +33,7 @@ set(APP_SOURCES
     ../../INTERFACE/UI/control/control_CONT.c
     ../../INTERFACE/UI/control/control_Hardware_API.c
     ../../INTERFACE/UI/control/control_OVAR.c
+    ../../INTERFACE/UI/control/control_INC.c
     ../../INTERFACE/UI/control/control_TC.c
     ../../INTERFACE/UI/control/control_VHIT.c
     ../../INTERFACE/UI/control/control_VOR.c

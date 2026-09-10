@@ -44,6 +44,9 @@ class TaskScheduler:
         self._stop_requested = False
         self._history_id: Optional[str] = None
         self._run_end_index: Optional[int] = None
+        self._device_mode = "VOR"
+        self._ovar_phase: Optional[str] = None
+        self._ovar_fault_return = False
         self._lock = threading.RLock()
         self._actions: "queue.Queue[Action]" = queue.Queue()
         self._stop = threading.Event()
@@ -69,6 +72,8 @@ class TaskScheduler:
                 "task_count": len(self._tasks),
                 "tasks": [task.to_dict(index) for index, task in enumerate(self._tasks)],
                 "encoder_angle": self._encoder_angle,
+                "device_mode": self._device_mode,
+                "phase": self._ovar_phase,
             }
 
     def tasks(self) -> List[Dict[str, Any]]:
@@ -121,9 +126,10 @@ class TaskScheduler:
     def template_tasks(self) -> List[Dict[str, Any]]:
         with self._lock:
             self._require_mutable()
-            return [{"count": task.count, "velocity": task.velocity,
-                     "frequency": task.frequency, "ex_mode": task.ex_mode}
-                    for task in self._tasks]
+            fields = ("mode", "count", "velocity", "frequency", "ex_mode",
+                      "seconds", "incline_degree")
+            return [{field: getattr(task, field) for field in fields
+                     if getattr(task, field) is not None} for task in self._tasks]
 
     def is_mutable(self) -> bool:
         with self._lock:
@@ -187,7 +193,7 @@ class TaskScheduler:
         if name == "stop":
             return self._stop_run()
         if name == "status":
-            return self.client.command("Status")
+            return self.client.command("Status", mode=self._device_mode)
         if name == "retry":
             return self._retry()
         if name == "skip":
@@ -209,7 +215,7 @@ class TaskScheduler:
             for index, task in enumerate(self._tasks):
                 task.state = TaskState.QUEUED
                 task.progress = 0
-                task.remaining = task.count
+                task.remaining = (task.count if task.mode == "VOR" else task.seconds) or 0
                 task.error = ""
                 if index < start_index:
                     task.state = TaskState.SKIPPED
@@ -218,6 +224,7 @@ class TaskScheduler:
             self._encoder_angle = None
             self._stop_requested = False
             self._waiting_idle = False
+            self._ovar_fault_return = False
             if self.history is not None:
                 history_tasks = [task.to_dict(index)
                                  for index, task in enumerate(self._tasks)]
@@ -238,28 +245,50 @@ class TaskScheduler:
             task = self._tasks[self._current_index]
             task.state = TaskState.STARTING
             self._state = RunState.STARTING
-            self._message = f"starting VOR #{self._current_index + 1:02d}"
-            parameters = (f"C={task.count} V={task.velocity:g} "
-                          f"F={task.frequency:g} E={task.ex_mode}")
+            self._message = f"starting {task.mode} #{self._current_index + 1:02d}"
         try:
-            self.client.command("Start", parameters)
+            if task.mode == "OVAR":
+                self._start_ovar_phase("INC_UP")
+            else:
+                self._ovar_phase = None
+                self._device_mode = "VOR"
+                self.client.command("Start", task.parameters(), mode="VOR")
             self._history_update("STARTING")
         except Exception as error:
             self._fault(str(error))
             raise
 
+    def _start_ovar_phase(self, phase: str) -> None:
+        task = self._tasks[self._current_index]
+        self._ovar_phase = phase
+        self._waiting_idle = False
+        self._state = RunState.STARTING
+        if phase == "INC_UP":
+            self._device_mode = "INC"
+            self._message = f"raising incline to {task.incline_degree:g}°"
+            parameters = f"A={task.incline_degree:g}"
+        elif phase == "OVAR":
+            self._device_mode = "OVAR"
+            self._message = "running OVAR motor"
+            parameters = f"S={task.seconds} V={task.velocity:g}"
+        else:
+            self._device_mode = "INC"
+            self._message = "returning incline to 0°"
+            parameters = "A=0"
+        self.client.command("Start", parameters, mode=self._device_mode)
+
     def _pause(self) -> Dict[str, Any]:
         with self._lock:
-            if self._state != RunState.RUNNING:
+            if self._state != RunState.RUNNING or self._device_mode == "INC":
                 raise SchedulerError("pause requires RUNNING")
-        self.client.command("Pause")
+        self.client.command("Pause", mode=self._device_mode)
         return self.snapshot()
 
     def _resume(self) -> Dict[str, Any]:
         with self._lock:
             if self._state != RunState.PAUSED:
                 raise SchedulerError("resume requires PAUSED")
-        self.client.command("Resume")
+        self.client.command("Resume", mode=self._device_mode)
         return self.snapshot()
 
     def _stop_run(self) -> Dict[str, Any]:
@@ -270,7 +299,7 @@ class TaskScheduler:
             self._state = RunState.STOPPING
             self._message = "stopping task list"
         try:
-            self.client.command("Stop")
+            self.client.command("Stop", mode=self._device_mode)
         except CommandRejected as error:
             if error.ack.message != "NO_PC_SESSION":
                 self._fault(str(error))
@@ -285,7 +314,7 @@ class TaskScheduler:
             task = self._tasks[self._current_index]
             task.error = ""
         try:
-            ack = self.client.command("Status")
+            ack = self.client.command("Status", mode=self._device_mode)
             with self._lock:
                 self._state = RunState.PAUSED if ack.state == "PAUSED" else RunState.RUNNING
                 task.state = TaskState.PAUSED if self._state == RunState.PAUSED else TaskState.RUNNING
@@ -303,7 +332,7 @@ class TaskScheduler:
             if self._state != RunState.FAULT or self._current_index is None:
                 raise SchedulerError("skip requires FAULT")
         try:
-            self.client.command("Stop")
+            self.client.command("Stop", mode=self._device_mode)
             with self._lock:
                 self._waiting_idle = True
                 self._message = "stopping failed task before skip"
@@ -318,24 +347,34 @@ class TaskScheduler:
             if self._current_index is None or self._current_index >= len(self._tasks):
                 return
             task = self._tasks[self._current_index]
-            task.progress = event.progress
-            task.remaining = event.remaining
+            if event.mode != self._device_mode:
+                return
+            if task.mode != "OVAR" or self._ovar_phase == "OVAR":
+                task.progress = event.progress
+                task.remaining = event.remaining
             if event.event == "ENCODER" and event.angle is not None:
                 self._encoder_angle = event.angle
                 return
             if event.event in {"RUNNING", "MOTOR_START", "PROGRESS"}:
-                self._state = RunState.RUNNING
-                task.state = TaskState.RUNNING
-                self._message = "running"
+                if self._stop_requested and self._ovar_phase == "INC_DOWN":
+                    self._state = RunState.STOPPING
+                    task.state = TaskState.STOPPED
+                    self._message = "returning incline after stop"
+                else:
+                    self._state = RunState.RUNNING
+                    task.state = TaskState.RUNNING
+                    self._message = "running"
             elif event.event == "PAUSED":
                 self._state = RunState.PAUSED
                 task.state = TaskState.PAUSED
                 self._message = "paused"
                 self._history_update("PAUSED")
             elif event.event == "COMPLETED":
-                task.state = TaskState.COMPLETED
-                task.progress = 100
-                task.remaining = 0
+                if ((task.mode != "OVAR" or self._ovar_phase == "INC_DOWN") and
+                        not self._stop_requested and not self._ovar_fault_return):
+                    task.state = TaskState.COMPLETED
+                    task.progress = 100
+                    task.remaining = 0
                 self._waiting_idle = True
                 self._message = "waiting for device idle"
                 self._history_update("RUNNING")
@@ -345,9 +384,27 @@ class TaskScheduler:
                 self._waiting_idle = True
             elif event.event == "ERROR" or event.code != 0:
                 self._fault(f"device error {event.code}: {event.event}")
+                if task.mode == "OVAR":
+                    self._ovar_fault_return = True
                 return
             elif event.event == "IDLE":
-                if self._stop_requested:
+                if task.mode == "OVAR":
+                    if self._ovar_fault_return and self._ovar_phase != "INC_DOWN":
+                        self._start_ovar_phase("INC_DOWN")
+                    elif self._ovar_fault_return:
+                        self._state = RunState.FAULT
+                        self._waiting_idle = False
+                    elif self._stop_requested and self._ovar_phase != "INC_DOWN":
+                        self._start_ovar_phase("INC_DOWN")
+                    elif self._stop_requested:
+                        self._finish_stopped()
+                    elif self._ovar_phase == "INC_UP":
+                        self._start_ovar_phase("OVAR")
+                    elif self._ovar_phase == "OVAR":
+                        self._start_ovar_phase("INC_DOWN")
+                    elif self._waiting_idle:
+                        self._advance(skipped=task.state == TaskState.ERROR)
+                elif self._stop_requested:
                     self._finish_stopped()
                 elif self._waiting_idle:
                     self._advance(skipped=task.state == TaskState.ERROR)

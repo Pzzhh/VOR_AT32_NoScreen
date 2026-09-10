@@ -54,6 +54,7 @@ static const char *Task_Mode_Name(Task_Parameter_Mode_enum mode)
     case Task_OVAR: return "OVAR";
     case Task_VHIT: return "VHIT";
     case Task_TC: return "TC";
+    case Task_Incline: return "INC";
     default: return "UNKNOWN";
     }
 }
@@ -228,7 +229,6 @@ static uint8_t Parse_Start(char *save, USB_VOR_Command *command,
                 USB_SET_U32(0x01, integer_value);
                 command->task.OVAR.Sec = (int)integer_value;
             } else if (token[0] == 'V') USB_SET_FLOAT(0x02, command->task.OVAR.Vel);
-            else if (token[0] == 'I') USB_SET_FLOAT(0x04, command->task.OVAR.Inc_Degree);
             else return 0;
             break;
         case Task_VHIT:
@@ -241,6 +241,10 @@ static uint8_t Parse_Start(char *save, USB_VOR_Command *command,
         case Task_TC:
             if (token[0] == 'C') USB_SET_U32(0x01, command->task.TC.Counter);
             else if (token[0] == 'V') USB_SET_FLOAT(0x02, command->task.TC.Vel);
+            else return 0;
+            break;
+        case Task_Incline:
+            if (token[0] == 'A') USB_SET_FLOAT(0x01, command->task.INC.Angle);
             else return 0;
             break;
         default:
@@ -264,10 +268,9 @@ static uint8_t Parse_Start(char *save, USB_VOR_Command *command,
                command->task.CONT.Vel >= -360.0f && command->task.CONT.Vel <= 360.0f &&
                command->task.CONT.okr_Vel >= -360.0f && command->task.CONT.okr_Vel <= 360.0f;
     case Task_OVAR:
-        return fields == 0x07 && command->task.OVAR.Sec >= 1 &&
+        return fields == 0x03 && command->task.OVAR.Sec >= 1 &&
                command->task.OVAR.Sec <= 1000 &&
-               command->task.OVAR.Vel >= -360.0f && command->task.OVAR.Vel <= 360.0f &&
-               command->task.OVAR.Inc_Degree >= 0.0f && command->task.OVAR.Inc_Degree <= 50.0f;
+               command->task.OVAR.Vel >= -360.0f && command->task.OVAR.Vel <= 360.0f;
     case Task_VHIT:
         return fields == 0x03 && command->task.VHIT.Counter >= 1U &&
                command->task.VHIT.Counter <= 1000U && command->task.VHIT.IsCW <= 1U;
@@ -275,6 +278,9 @@ static uint8_t Parse_Start(char *save, USB_VOR_Command *command,
         return fields == 0x03 && command->task.TC.Counter >= 1U &&
                command->task.TC.Counter <= 1000U &&
                command->task.TC.Vel >= -360.0f && command->task.TC.Vel <= 360.0f;
+    case Task_Incline:
+        return fields == 0x01 && command->task.INC.Angle >= 0.0f &&
+               command->task.INC.Angle <= 50.0f;
     default:
         return 0;
     }
@@ -319,6 +325,7 @@ uint8_t USB_VOR_Command_Process(const char *line)
     else if (strcmp(mode_text, "OVAR") == 0) requested_mode = Task_OVAR;
     else if (strcmp(mode_text, "VHIT") == 0) requested_mode = Task_VHIT;
     else if (strcmp(mode_text, "TC") == 0) requested_mode = Task_TC;
+    else if (strcmp(mode_text, "INC") == 0) requested_mode = Task_Incline;
     else {
         Send_Immediate(0, 0, "Unknown", CONTROL_RESULT_UNSUPPORTED_MODE,
                        "UNSUPPORTED_MODE");

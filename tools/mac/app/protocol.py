@@ -52,6 +52,7 @@ def parse_line(line: str) -> Optional[Union[Ack, Event]]:
     return None
 
 
-def format_command(action: str, request_id: int, parameters: str = "") -> bytes:
+def format_command(action: str, request_id: int, parameters: str = "",
+                   mode: str = "VOR") -> bytes:
     suffix = f" {parameters}" if parameters else ""
-    return f"Ctrl:VOR.{action} ID={request_id}{suffix}\r\n".encode("ascii")
+    return f"Ctrl:{mode}.{action} ID={request_id}{suffix}\r\n".encode("ascii")

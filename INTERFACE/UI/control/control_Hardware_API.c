@@ -3,8 +3,8 @@
  * @Date: 2024-07-25 14:38:08
  * @LastEditors: pzzhh2 101804901+Pzzhh@users.noreply.github.com
  * @LastEditTime: 2025-11-14 16:14:48
- * @FilePath: \USER  d:\workfile\ÏîÄ¿3 vor\software\VOR_V2.0\INTERFACE\UI\control\control_Hardware_API.c
- * @Description: ÕâÊÇÄ¬ÈÏÉèÖÃ,ÇëÉèÖÃ`customMade`, ´ò¿ªkoroFileHeader²é¿´ÅäÖÃ ½øÐÐÉèÖÃ: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ * @FilePath: \USER  d:\workfile\ï¿½ï¿½Ä¿3 vor\software\VOR_V2.0\INTERFACE\UI\control\control_Hardware_API.c
+ * @Description: ï¿½ï¿½ï¿½ï¿½Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½`customMade`, ï¿½ï¿½koroFileHeaderï¿½é¿´ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #include "control_Hardware_API.h"
 #include "../Task/task_stroage.h"
@@ -95,6 +95,14 @@ uint8_t HAL_Incline_Get_State(float *angle)
 	return 0;
 }
 
+uint8_t HAL_Incline_Stop(void)
+{
+#ifdef ATM32F43_xx
+	INC_Machine_Stop();
+#endif
+	return 1;
+}
+
 uint8_t HAL_Incline_Fouces_Move(int8_t direction)
 {
 	extern uint8_t inc_dir_g;
@@ -132,7 +140,7 @@ uint8_t HAL_CAM_Init(void)
 #endif
 	return 0;
 }
-// 0 ·¢Éú´íÎó 1 Õý³£
+// 0 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 1 ï¿½ï¿½ï¿½ï¿½
 uint8_t HAL_CAM_REC_Set(uint8_t flag)
 {
 	static uint8_t Cam_Flag = 0;
@@ -158,7 +166,7 @@ uint8_t HAL_CAM_REC_Set(uint8_t flag)
 	return res;
 }
 
-// 0 ·¢Éú´íÎó 1 Õý³£
+// 0 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 1 ï¿½ï¿½ï¿½ï¿½
 uint8_t HAL_CAM_SET_Set(void)
 {
 	uint8_t res = 1; // reture success
@@ -174,7 +182,7 @@ uint8_t HAL_CAM_SET_Set(void)
 	return res;
 }
 
-// 0 ·¢Éú´íÎó 1 Õý³£
+// 0 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 1 ï¿½ï¿½ï¿½ï¿½
 uint8_t HAL_CAM_SET_sign_led(void)
 {
 	uint8_t res = 1; // reture success
@@ -447,15 +455,15 @@ uint8_t HAL_TIME_Get(timetyped *time)
 
 uint16_t crc16_modbus(const uint8_t *data, uint16_t length)
 {
-	uint16_t crc = 0xFFFF; // ³õÊ¼Öµ
+	uint16_t crc = 0xFFFF; // ï¿½ï¿½Ê¼Öµ
 	for (uint16_t i = 0; i < length; i++)
 	{
-		crc ^= data[i]; // Öð×Ö½ÚÒì»ò
+		crc ^= data[i]; // ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½ï¿½
 		for (uint8_t j = 0; j < 8; j++)
 		{
 			if (crc & 0x0001)
 			{
-				crc = (crc >> 1) ^ 0xA001; // ÓÒÒÆ²¢Òì»ò¶àÏîÊ½ 0xA001
+				crc = (crc >> 1) ^ 0xA001; // ï¿½ï¿½ï¿½Æ²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê½ 0xA001
 			}
 			else
 			{
@@ -468,15 +476,15 @@ uint16_t crc16_modbus(const uint8_t *data, uint16_t length)
 
 uint16_t crc16_Custom(const uint8_t *data, uint16_t length, uint16_t crcfactor)
 {
-	uint16_t crc = 0xFFFF; // ³õÊ¼Öµ
+	uint16_t crc = 0xFFFF; // ï¿½ï¿½Ê¼Öµ
 	for (uint16_t i = 0; i < length; i++)
 	{
-		crc ^= data[i]; // Öð×Ö½ÚÒì»ò
+		crc ^= data[i]; // ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½ï¿½
 		for (uint8_t j = 0; j < 8; j++)
 		{
 			if (crc & 0x0001)
 			{
-				crc = (crc >> 1) ^ crcfactor; // ÓÒÒÆ²¢Òì»ò¶àÏîÊ½ 0xA001
+				crc = (crc >> 1) ^ crcfactor; // ï¿½ï¿½ï¿½Æ²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê½ 0xA001
 			}
 			else
 			{
@@ -606,7 +614,7 @@ int HAL_TaskStroage_Write(uint8_t id, Task_Parameter_Struct *e, uint8_t count)
 	return 1;
 #else
 #define TASK_BKPSRAM_SIZE (4096U)
-#define TASK_BKP_MAX_DATA (480U)  /* Óë PC ¶Ë±£³ÖÒ»ÖÂ£¬¿É°´Ðèµ÷Õû */
+#define TASK_BKP_MAX_DATA (480U)  /* ï¿½ï¿½ PC ï¿½Ë±ï¿½ï¿½ï¿½Ò»ï¿½Â£ï¿½ï¿½É°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 #define TASK_BKP_HEADER_SIZE (6U) /* CRC(2)+TotalLen(2)+StructSize(2) */
 #define TASK_BKP_MAGIC (0xA55A)
 	uint32_t totalLen = (uint32_t)count * sizeof(Task_Parameter_Struct);
@@ -621,7 +629,7 @@ int HAL_TaskStroage_Write(uint8_t id, Task_Parameter_Struct *e, uint8_t count)
 
 	// uint8_t *p = (uint8_t *)0x40024500 + id * 12 * sizeof(Task_Parameter_Struct);
 
-	/* Ö±½ÓÐ´Èë (Backup SRAM ¿ÉÏñÆÕÍ¨ SRAM Ò»ÑùÐ´) */
+	/* Ö±ï¿½ï¿½Ð´ï¿½ï¿½ (Backup SRAM ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¨ SRAM Ò»ï¿½ï¿½Ð´) */
 	p[0] = (uint8_t)(crc & 0xFF);
 	p[1] = (uint8_t)(crc >> 8);
 	p[2] = (uint8_t)(totalLen & 0xFF);
@@ -636,7 +644,7 @@ int HAL_TaskStroage_Write(uint8_t id, Task_Parameter_Struct *e, uint8_t count)
 					  (uint8_t *)p, EROM_MAP_Task_Stroage_pS);
 	M24C64_Read_Byte(id * EROM_MAP_Task_Stroage_pS + EROM_MAP_Task_Stroage,
 					 (uint8_t *)p, EROM_MAP_Task_Stroage_pS);
-	/* ¿ÉÑ¡£ºÔÙÐ£ÑéÒ»´ÎÐ´ÈëÕýÈ· */
+	/* ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½Ð£ï¿½ï¿½Ò»ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½È· */
 	uint16_t verify = crc16_modbus(&p[TASK_BKP_HEADER_SIZE], (uint16_t)totalLen);
 	return (verify == crc) ? 1 : 0;
 	return 0;

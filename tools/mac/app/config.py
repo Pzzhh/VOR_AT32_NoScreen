@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -16,17 +17,6 @@ class SerialConfig:
 
 
 @dataclass(frozen=True)
-class TcpConfig:
-    host: str = ""
-    port: int = 0
-    connect_timeout_seconds: float = 3.0
-
-    @property
-    def enabled(self) -> bool:
-        return bool(self.host.strip()) and self.port > 0
-
-
-@dataclass(frozen=True)
 class WebConfig:
     host: str = "127.0.0.1"
     port: int = 8765
@@ -37,13 +27,14 @@ class AppConfig:
     serial: SerialConfig
     web: WebConfig
     log_limit: int = 1000
-    tcp: TcpConfig = TcpConfig()
     data_dir: str = "data"
     template_limit: int = 5
     history_limit: int = 20
 
 
 def default_config_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / "config.json"
     return Path(__file__).resolve().parents[1] / "config.json"
 
 
@@ -58,7 +49,6 @@ def load_config(path: Optional[Path] = None) -> AppConfig:
         serial=SerialConfig(**raw.get("serial", {})),
         web=WebConfig(**raw.get("web", {})),
         log_limit=int(raw.get("log_limit", 1000)),
-        tcp=TcpConfig(**raw.get("tcp", {})),
         data_dir=data_dir,
         template_limit=int(raw.get("template_limit", 5)),
         history_limit=int(raw.get("history_limit", 20)),
@@ -67,8 +57,6 @@ def load_config(path: Optional[Path] = None) -> AppConfig:
         raise ValueError("serial.baudrate must be positive")
     if config.log_limit < 100:
         raise ValueError("log_limit must be at least 100")
-    if not 0 <= config.tcp.port <= 65535:
-        raise ValueError("tcp.port must be between 0 and 65535")
     if config.template_limit < 1 or config.history_limit < 1:
         raise ValueError("storage limits must be positive")
     return config

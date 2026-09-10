@@ -1,8 +1,9 @@
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.config import AppConfig, SerialConfig, TcpConfig, WebConfig
+from app.config import AppConfig, SerialConfig, WebConfig
 from app.main import create_app
 
 
@@ -42,10 +43,10 @@ def test_websocket_delivers_snapshot() -> None:
             assert message["data"]["serial"]["connected"] is False
 
 
-def test_tcp_configuration_takes_priority() -> None:
-    config = AppConfig(SerialConfig(port="/dev/unused"), WebConfig(), 200,
-                       TcpConfig(host="127.0.0.1", port=9900))
-    with TestClient(create_app(config)) as client:
-        status = client.get("/api/status").json()["data"]["serial"]
-        assert status["transport"] == "tcp"
-        assert status["endpoint"] == "127.0.0.1:9900"
+def test_serial_port_can_be_listed_and_selected() -> None:
+    with make_client() as client:
+        with patch("app.serial_client.list_ports.comports", return_value=[]):
+            assert client.get("/api/serial/ports").json()["data"] == []
+        selected = client.put("/api/serial/port", json={"port": "COM7"})
+        assert selected.status_code == 200
+        assert selected.json()["data"]["port"] == "COM7"

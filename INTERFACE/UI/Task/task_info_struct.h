@@ -22,6 +22,7 @@ extern "C"
         Task_OVAR,
         Task_VHIT,
         Task_TC,
+        Task_Incline,
     }Task_Parameter_Mode_enum;
     typedef enum
     {
@@ -59,6 +60,9 @@ extern "C"
         uint32_t Counter;
         float Vel;
     }Task_Parameter_TC;
+    typedef struct {
+        float Angle;
+    }Task_Parameter_Incline;
 
 
 
@@ -72,6 +76,7 @@ extern "C"
             Task_Parameter_OVAR OVAR;
             Task_Parameter_VHIT VHIT;
             Task_Parameter_TC TC;
+            Task_Parameter_Incline INC;
         };
     }Task_Parameter_Struct;
 

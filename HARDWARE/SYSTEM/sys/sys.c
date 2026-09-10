@@ -97,7 +97,7 @@ void DFU_PowerUp_Detection()
 	{
 		dfuFlag = 0;
 		// RCC->CSR = 0;	  // 清除标志位
-		// JumpBootLoader(); // 进入bootloader
+		JumpBootLoader(); // jump to the system DFU bootloader
 	}
 	// RCC->CSR = RCC_CSR_RMVF;
 	dfuFlag = 0;

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import AppConfig
 from .models import (ReorderInput, StartRunInput, TemplateCreateInput,
-                     TemplateImportInput, VorTaskInput, api_result)
+                     TemplateImportInput, SerialPortInput, VorTaskInput, api_result)
 from .scheduler import SchedulerError, TaskScheduler
 from .serial_client import SerialClient, SerialClientError
 from .storage import HistoryStore, TemplateStore
@@ -26,7 +26,7 @@ class HostService:
                                        config.template_limit)
         self.history = HistoryStore(data_dir / "history.json",
                                     config.history_limit)
-        self.serial = SerialClient(config.serial, config.log_limit, config.tcp)
+        self.serial = SerialClient(config.serial, config.log_limit)
         self.scheduler = TaskScheduler(self.serial, self.history)
 
     def close(self) -> None:
@@ -95,12 +95,6 @@ def create_app(config: AppConfig) -> FastAPI:
                 "run_timeout_seconds": config.serial.run_timeout_seconds,
                 "reconnect_interval_seconds": config.serial.reconnect_interval_seconds,
             },
-            "tcp": {
-                "enabled": config.tcp.enabled,
-                "host": config.tcp.host,
-                "port": config.tcp.port,
-                "connect_timeout_seconds": config.tcp.connect_timeout_seconds,
-            },
             "web": {"host": config.web.host, "port": config.web.port},
             "task_limit": TaskScheduler.MAX_TASKS,
             "template_limit": config.template_limit,
@@ -115,6 +109,15 @@ def create_app(config: AppConfig) -> FastAPI:
     @app.post("/api/serial/disconnect")
     async def serial_disconnect() -> Dict[str, Any]:
         service.serial.disconnect()
+        return api_result(service.serial.snapshot())
+
+    @app.get("/api/serial/ports")
+    async def serial_ports() -> Dict[str, Any]:
+        return api_result(service.serial.available_ports())
+
+    @app.put("/api/serial/port")
+    async def select_serial_port(data: SerialPortInput) -> Dict[str, Any]:
+        service.serial.select_port(data.port)
         return api_result(service.serial.snapshot())
 
     @app.get("/api/tasks")

@@ -133,7 +133,7 @@ void UI_Page_Management_Init()
 	Message_Center_Read_prinft("Ctrl", &value, sizeof(int), "isNeedSetup");
 	// value = 0;
 //	Verify_hardResetVaild();
-//	value = 0;
+	value = 0;
 #ifndef ATM32F43_xx
 	//value = 1;
 #endif

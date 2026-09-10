@@ -26,6 +26,7 @@
 #include "control_OVAR.h"
 #include "control_VHIT.h"
 #include "control_TC.h"
+#include "control_INC.h"
 #include "control_ZERO.h"
 #include "control_base.h"
 #include "../../../commuication/usb_vor_control.h"
@@ -291,6 +292,7 @@ USB_RUNNING:
 	case Task_OVAR:     usb_driver = OVAR_Get_Driver(); break;
 	case Task_VHIT:     usb_driver = VHIT_Get_Driver(); break;
 	case Task_TC:       usb_driver = TC_Get_Driver(); break;
+//	case Task_Incline:  usb_driver = INC_Get_Driver(); break;
 	default: break;
 	}
 

@@ -6,11 +6,6 @@
     "run_timeout_seconds": 120.0,
     "reconnect_interval_seconds": 2.0
   },
-  "tcp": {
-    "host": "10.211.55.6",
-    "port": 9000,
-    "connect_timeout_seconds": 3.0
-  },
   "web": {
     "host": "127.0.0.1",
     "port": 8765

@@ -1,0 +1,1 @@
+pyinstaller --onedir --name VOR-Control --add-data "app\static;app\static" --add-data "config.json;." launcher.py

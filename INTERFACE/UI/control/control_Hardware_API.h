@@ -64,6 +64,7 @@ extern "C"
 
 	uint8_t HAL_Incline_Init(float angle, uint32_t time);
 	uint8_t HAL_Incline_Get_State(float* angle);
+	uint8_t HAL_Incline_Stop(void);
 	uint8_t HAL_Incline_Fouces_Move(int8_t direction);
 
 	uint8_t HAL_Get_C610_Status(void);

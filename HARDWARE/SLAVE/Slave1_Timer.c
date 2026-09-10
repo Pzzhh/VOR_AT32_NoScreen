@@ -384,7 +384,8 @@ float Slave1_Get_Encode_Angle()
     // }
     int32_t count = *(int32_t *)&(TMR2->cval);
     count = count - 1073741 / 2;
-    float angle = count / 1073741.0f * 360.0f;
+    float angle = 0;
+	angle=Slave1_Get_Encode_Angle_real();
     return angle+soft_angle_CNT;
 }
 
@@ -392,8 +393,8 @@ float Slave1_Get_Encode_Angle_real()
 {
 
     int32_t count = *(int32_t *)&(TMR2->cval);
-    count = count - 1073741 / 2;
-    float angle = count / 1073741.0f * 360.0f;
+    count = count;
+    float angle = count / 400000 * 360.0f;
     return angle;
 }
 

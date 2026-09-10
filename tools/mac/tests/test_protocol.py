@@ -15,6 +15,9 @@ def test_command_format() -> None:
     assert format_command("Start", 3, "C=20 V=50 F=1.6 E=0") == (
         b"Ctrl:VOR.Start ID=3 C=20 V=50 F=1.6 E=0\r\n"
     )
+    assert format_command("Start", 4, "A=15", "INC") == (
+        b"Ctrl:INC.Start ID=4 A=15\r\n"
+    )
 
 
 def test_encoder_event_parsing() -> None:

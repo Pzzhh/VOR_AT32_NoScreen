@@ -1,10 +1,26 @@
-# USB VOR Web Host
+# USB VOR / OVAR Web Host
 
-本目录是USB VOR网页上位机。首版仅支持VOR，由Python在内存中管理最多20个任务，并按顺序逐项发送到单片机。
+本目录是 USB VOR/OVAR 网页上位机。Python 在内存中管理最多20个任务，并按顺序逐项发送到单片机。
 
-The web interface is English-first. Tasks are automatically labelled `VOR #01`,
+The web interface is English-first. Tasks are automatically labelled `VOR #01` or `OVAR #01`,
 so users only enter motor parameters. Arrange mode, start-from selection, full-list
 templates, and run history are managed by the Python host.
+
+## OVAR command split
+
+An OVAR item remains one task in the web list, but the host executes three independent
+device commands. Incline movement and OVAR rotation are never combined in one command:
+
+```text
+Ctrl:INC.Start ID=n A=15
+Ctrl:OVAR.Start ID=n S=60 V=30
+Ctrl:INC.Start ID=n A=0
+```
+
+The host waits for `COMPLETED` and `IDLE` after each step before starting the next.
+`Ctrl:OVAR.Start` accepts only `S` (seconds) and `V` (velocity); `Ctrl:INC.Start`
+accepts only `A` (target angle, 0..50 degrees). Stop or an OVAR execution error also
+triggers a separate `INC.Start A=0` recovery step before the queue ends.
 
 ## Mac安装
 
@@ -16,48 +32,15 @@ python3 -m venv .venv
 
 依赖中包含Uvicorn所需的WebSocket协议实现。如果此前已经创建过虚拟环境，也需要重新执行上述安装命令。
 
-编辑 `config.json`，明确填写USB串口。例如：
+网页顶部会自动列出可用串口；在下拉列表中选择设备后点击 **Connect**。Windows 会显示为 `COM3`、`COM7` 等，无需手工修改配置。若端口刚插入，点击列表旁的刷新按钮。
+
+也可在 `config.json` 中预设 USB 串口，例如：
 
 ```json
 "port": "/dev/cu.usbmodem1101"
 ```
 
 程序不会自动扫描串口。端口为空时网页仍能启动，但会显示“USB未连接”。
-
-### TCP模拟机
-
-如果配置了有效的 `tcp.host` 和 `tcp.port`，程序优先使用TCP；否则使用串口：
-
-```json
-"tcp": {
-  "host": "127.0.0.1",
-  "port": 9000,
-  "connect_timeout_seconds": 3.0
-}
-```
-
-启动内置模拟设备：
-
-```bash
-.venv/bin/python tools/tcp_device_simulator.py --host 127.0.0.1 --port 9000
-```
-
-再启动网页服务并点击 Connect。模拟设备支持 Start、Status、Pause、Resume、Stop，使用与MCU相同的ASCII单行协议。要恢复真实USB串口，将 `tcp.host` 设为空字符串或将 `tcp.port` 设为0并重启网页服务。
-
-### Linux TCP转TTY
-
-Linux模拟程序已经连接到PTY/TTY peer时，可启动透明双向转发：
-
-```bash
-python3 tools/tcp_tty_bridge.py \
-  --tty /tmp/ttyUSBpeer \
-  --host 0.0.0.0 \
-  --port 9000 \
-  --baudrate 115200 \
-  --verbose
-```
-
-Mac网页端将 `tcp.host` 设置为Linux机器IP、`tcp.port` 设置为9000。脚本不解析或修改数据，TCP断开后继续监听下一次连接；TTY暂时不存在时每秒重试。
 
 启动：
 
@@ -92,10 +75,18 @@ VOR_HOST_CONFIG=/absolute/path/config.json .venv/bin/python -m app
 
 复制 `tools/mac` 源码，在Linux重新创建 `.venv`并安装同一份依赖，只需把 `config.json`中的端口改为 `/dev/ttyACM0`或socat生成的PTY。
 
+## Windows 打包
+
+Windows 10/11 安装 Python 3.10 或更高版本后，双击或在命令提示符执行 `build_windows.bat`。脚本会创建虚拟环境、安装依赖并生成：
+
+`dist\VOR-Control\VOR-Control.exe`
+
+将整个 `dist\VOR-Control` 目录复制到目标电脑后运行其中的 `VOR-Control.exe`，再用浏览器打开 `http://127.0.0.1:8765`。请保留同目录的 `config.json`，可按需设置波特率。
+
 ## REST API
 
 - `GET /api/status`、`GET /api/config`、`GET /api/logs`
-- `POST /api/serial/connect`、`disconnect`
+- `GET /api/serial/ports`、`PUT /api/serial/port`、`POST /api/serial/connect`、`disconnect`
 - `GET/POST /api/tasks`
 - `PUT/DELETE /api/tasks/{id}`
 - `POST /api/tasks/reorder`

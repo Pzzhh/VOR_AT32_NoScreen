@@ -23,6 +23,7 @@ static uint32_t USB_Initial_Remaining(const Task_Parameter_Struct *task)
     case Task_OVAR: return (uint32_t)task->OVAR.Sec;
     case Task_VHIT: return task->VHIT.Counter;
     case Task_TC: return task->TC.Counter;
+    case Task_Incline: return 1U;
     default: return 0;
     }
 }

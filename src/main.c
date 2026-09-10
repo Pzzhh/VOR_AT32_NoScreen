@@ -120,6 +120,8 @@ void LVGL_HANDLER()
   uint8_t buf[20] = {0};
   int isReady = 0;
   ControlDelay(100);
+	extern void SRV1_Encoder_Init();
+	 SRV1_Encoder_Init();
   while (1)
   {
     Message_Center_Read_prinft("Ctrl", buf, 20, "ISCtrlInit");

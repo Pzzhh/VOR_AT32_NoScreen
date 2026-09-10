@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import queue
-import select
-import socket
 import threading
 import time
 from collections import deque
@@ -11,8 +9,9 @@ from datetime import datetime
 from typing import Any, Callable, Deque, Dict, List, Optional
 
 import serial
+from serial.tools import list_ports
 
-from .config import SerialConfig, TcpConfig
+from .config import SerialConfig
 from .protocol import Ack, Event, format_command, parse_line
 
 
@@ -38,13 +37,10 @@ class PendingCommand:
 
 
 class SerialClient:
-    """Single-owner TCP/serial worker with ACK matching and bounded logs."""
+    """Single-owner USB serial worker with ACK matching and bounded logs."""
 
-    def __init__(self, config: SerialConfig, log_limit: int = 1000,
-                 tcp_config: Optional[TcpConfig] = None) -> None:
+    def __init__(self, config: SerialConfig, log_limit: int = 1000) -> None:
         self.config = config
-        self.tcp_config = tcp_config or TcpConfig()
-        self.transport = "tcp" if self.tcp_config.enabled else "serial"
         self._operations: "queue.Queue[tuple]" = queue.Queue()
         self._pending: Dict[int, PendingCommand] = {}
         self._listeners: List[Callable[[str, Any], None]] = []
@@ -63,10 +59,32 @@ class SerialClient:
         self._listeners.append(callback)
 
     def connect(self) -> None:
-        if self.transport == "serial" and not self.config.port:
+        if not self.config.port:
             raise SerialClientError("serial.port is empty; edit config.json")
         self._desired_connected = True
         self._operations.put(("connect",))
+
+    @staticmethod
+    def available_ports() -> List[Dict[str, str]]:
+        """List ports for the web selector, including Windows COM ports."""
+        return [
+            {"device": item.device,
+             "label": " - ".join(part for part in
+                               (item.device, item.description) if part),
+             "description": item.description or "", "hwid": item.hwid or ""}
+            for item in sorted(list_ports.comports(), key=lambda item: item.device)
+        ]
+
+    def select_port(self, port: str) -> None:
+        if self._connected or self._desired_connected:
+            raise SerialClientError("disconnect USB before selecting another serial port")
+        selected = port.strip()
+        if not selected:
+            raise SerialClientError("serial port is empty")
+        self.config = SerialConfig(selected, self.config.baudrate,
+                                   self.config.ack_timeout_seconds,
+                                   self.config.run_timeout_seconds,
+                                   self.config.reconnect_interval_seconds)
 
     def disconnect(self) -> None:
         self._desired_connected = False
@@ -78,16 +96,16 @@ class SerialClient:
         self._thread.join(timeout=2)
 
     def command(self, action: str, parameters: str = "",
-                timeout: Optional[float] = None) -> Ack:
+                timeout: Optional[float] = None, mode: str = "VOR") -> Ack:
         with self._lock:
             if not self._connected:
-                raise SerialClientError(f"{self.transport.upper()} is not connected")
+                raise SerialClientError("USB serial is not connected")
             request_id = self._next_id
             self._next_id += 1
             pending = PendingCommand(threading.Event())
             self._pending[request_id] = pending
         self._operations.put(("send", request_id,
-                              format_command(action, request_id, parameters)))
+                              format_command(action, request_id, parameters, mode)))
         wait_time = timeout or self.config.ack_timeout_seconds
         if not pending.event.wait(wait_time):
             with self._lock:
@@ -108,11 +126,8 @@ class SerialClient:
                 "desired_connected": self._desired_connected,
                 "port": self.config.port,
                 "baudrate": self.config.baudrate,
-                "transport": self.transport,
-                "endpoint": (f"{self.tcp_config.host}:{self.tcp_config.port}"
-                             if self.transport == "tcp" else self.config.port),
-                "tcp_host": self.tcp_config.host,
-                "tcp_port": self.tcp_config.port,
+                "transport": "serial",
+                "endpoint": self.config.port,
                 "error": self._connection_error,
             }
 
@@ -212,11 +227,8 @@ class SerialClient:
                             pending.event.set()
                     else:
                         try:
-                            if self.transport == "tcp":
-                                device.sendall(payload)
-                            else:
-                                device.write(payload)
-                                device.flush()
+                            device.write(payload)
+                            device.flush()
                             self._add_log("TX", payload.decode("ascii").strip(), "TX")
                         except Exception as error:
                             self._add_log("ERROR", str(error), "ERROR")
@@ -228,32 +240,19 @@ class SerialClient:
 
             if device is None and self._desired_connected and time.monotonic() >= next_reconnect:
                 try:
-                    if self.transport == "tcp":
-                        device = socket.create_connection(
-                            (self.tcp_config.host, self.tcp_config.port),
-                            timeout=self.tcp_config.connect_timeout_seconds)
-                        device.setblocking(False)
-                        endpoint = f"{self.tcp_config.host}:{self.tcp_config.port}"
-                    else:
-                        device = serial.Serial(self.config.port, self.config.baudrate,
-                                               timeout=0, write_timeout=1)
-                        endpoint = self.config.port
+                    device = serial.Serial(self.config.port, self.config.baudrate,
+                                           timeout=0, write_timeout=1)
+                    endpoint = self.config.port
                     buffer.clear()
                     self._set_connected(True)
-                    self._add_log("INFO", f"connected {self.transport} {endpoint}", "INFO")
+                    self._add_log("INFO", f"connected USB serial {endpoint}", "INFO")
                 except Exception as error:
                     self._set_connected(False, str(error))
                     next_reconnect = time.monotonic() + self.config.reconnect_interval_seconds
 
             if device is not None:
                 try:
-                    if self.transport == "tcp":
-                        readable, _, _ = select.select([device], [], [], 0)
-                        chunk = device.recv(256) if readable else None
-                        if chunk == b"":
-                            raise ConnectionError("TCP peer disconnected")
-                    else:
-                        chunk = device.read(64)
+                    chunk = device.read(64)
                     if chunk:
                         buffer.extend(chunk)
                         while b"\n" in buffer or b"\r" in buffer:
