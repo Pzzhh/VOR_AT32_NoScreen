@@ -42,7 +42,21 @@ python3 -m venv .venv
 
 程序不会自动扫描串口。端口为空时网页仍能启动，但会显示“USB未连接”。
 
-启动：
+推荐使用本机启动脚本。Windows 在 PowerShell 或命令提示符中执行：
+
+```powershell
+py start_local.py
+```
+
+macOS / Linux 执行：
+
+```bash
+python3 start_local.py
+```
+
+脚本首次运行会自动创建 `.venv`、安装依赖、启动服务并打开浏览器。以后直接执行同一命令即可；按 `Ctrl+C` 停止。若不希望自动打开浏览器，追加 `--no-browser`。
+
+原有 macOS 启动方式仍可使用：
 
 ```bash
 ./run.sh
@@ -106,3 +120,20 @@ OpenAPI页面：`http://127.0.0.1:8765/docs`。
 cd tools/mac
 .venv/bin/python -m pytest -q
 ```
+# Dual-CDC telemetry
+
+Select the command CDC port in **Command port** and the second CDC port in
+**Telemetry port** before connecting. During a motor task the page plots the
+latest ten seconds of encoder position and calculated speed at 60 samples/s.
+Each CDC2 packet is 24 bytes: the fixed header `AA 55`, a little-endian 16-bit
+packet sequence, followed by five `(position x10, speed x10)` signed 16-bit
+sample pairs. The receiver scans for the header to recover packet alignment.
+
+CDC2 is optional. To run with a single virtual serial port, leave **Telemetry
+port** set to **No CDC2 (optional)**. Commands and motor tasks continue to work;
+only the live encoder chart is unavailable. An existing CDC2 selection can be
+cleared by choosing that option before connecting.
+
+Use **Save encoder CSV** to download buffered telemetry with local timestamps,
+sample and packet sequences, position in degrees, and speed in degrees per
+second. The in-memory buffer retains up to ten minutes (36,000 samples at 60 Hz).

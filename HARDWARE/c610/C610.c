@@ -119,6 +119,20 @@ int C610_is_Online()
     return isC610Online;
 }
 
+int C610_Get_Feedback(float *angle_deg, float *speed_rpm)
+{
+    uint16_t ecd;
+    int16_t rpm;
+
+    if (!isC610Online || angle_deg == 0 || speed_rpm == 0)
+        return 0;
+    ecd = motor_chassis[0].ecd;
+    rpm = motor_chassis[0].speed_rpm;
+    *angle_deg = (float)ecd * (360.0f / 8192.0f);
+    *speed_rpm = (float)rpm;
+    return 1;
+}
+
 void C610_RX_handler(uint32_t id, uint8_t *msg)
 {
     static float Vfilter[4][10];
@@ -143,8 +157,9 @@ void C610_RX_handler(uint32_t id, uint8_t *msg)
         if (i < 4)
         {
             get_motor_measure(&motor_chassis[i], msg);
-            Vfilter[i][index++] = motor_chassis[i].speed_rpm;
-            Ifilter[i][index++] = motor_chassis[i].given_current;
+            Vfilter[i][index] = motor_chassis[i].speed_rpm;
+            Ifilter[i][index] = motor_chassis[i].given_current;
+            index++;
             motor_chassis[i].speed_rpm = Avarage(Vfilter[i], 10);
             motor_chassis[i].given_current = Avarage(Ifilter[i], 10);
         }

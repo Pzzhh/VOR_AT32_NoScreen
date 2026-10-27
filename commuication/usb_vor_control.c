@@ -3,13 +3,14 @@
 #include "../INTERFACE/UI/control/control_VOR.h"
 #include "../INTERFACE/UI/control/control_base.h"
 #include "../INTERFACE/UI/control/control_Hardware_API.h"
+#include "../INTERFACE/UI/control/control_INC.h"
 #include "../INTERFACE/UI/other/system_function.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define USB_VOR_COMMAND_DEPTH 4U
-#define USB_VOR_LINE_SIZE 128U
+#define USB_VOR_LINE_SIZE 192U
 
 typedef struct {
     volatile USB_VOR_State state;
@@ -28,6 +29,7 @@ static USB_VOR_Status status = {
     .result = CONTROL_RESULT_OK
 };
 static volatile Task_Parameter_Mode_enum active_mode = Task_VOR;
+static uint32_t active_request_id;
 
 extern Task_control_info control_info;
 
@@ -86,13 +88,18 @@ static void Event_Push_Response(uint8_t ack, uint32_t id, const char *command,
 static void Event_Push_State(const char *event_name)
 {
     char line[USB_VOR_LINE_SIZE];
+    char feedback[32] = "";
+    float angle;
+    const Control_Driver *inc_driver = INC_Get_Driver();
+    if (active_mode == Task_Incline && inc_driver->get_angle(&angle))
+        snprintf(feedback, sizeof(feedback), " ANGLE=%.3f", (double)angle);
     status.sequence++;
     snprintf(line, sizeof(line),
-             "Ctrl:EVT SEQ=%lu EVENT=%s MODE=%s STATE=%s CODE=%u PCT=%lu REM=%lu\r\n",
+             "Ctrl:EVT SEQ=%lu EVENT=%s MODE=%s STATE=%s CODE=%u PCT=%lu REM=%lu ID=%lu%s\r\n",
              (unsigned long)status.sequence, event_name, Task_Mode_Name(active_mode),
              State_Name(status.state),
              (unsigned int)status.result, (unsigned long)status.progress,
-             (unsigned long)status.remaining);
+             (unsigned long)status.remaining, (unsigned long)active_request_id, feedback);
     Event_Push_Line(line);
 }
 
@@ -376,6 +383,11 @@ uint8_t USB_VOR_Command_Process(const char *line)
         return 1;
     }
 
+    if (command.type == USB_VOR_CMD_STATUS) {
+        Send_Immediate(1, command.id, command.name, CONTROL_RESULT_OK, "STATUS");
+        Event_Push_State("STATUS");
+        return 1;
+    }
     if (command.type != USB_VOR_CMD_START &&
         control_info.controlOwner != CONTROL_OWNER_USB) {
         Send_Immediate(0, command.id, command.name,
@@ -456,6 +468,11 @@ void USB_VOR_Task_Update(USB_VOR_State state, Control_Result result,
 void USB_VOR_Task_Set_Mode(Task_Parameter_Mode_enum mode)
 {
     active_mode = mode;
+}
+
+void USB_VOR_Task_Set_Request(uint32_t id)
+{
+    active_request_id = id;
 }
 
 void USB_VOR_Task_Reset(void)

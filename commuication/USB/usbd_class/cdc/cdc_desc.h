@@ -58,7 +58,7 @@ extern "C" {
 /**
   * @brief usb descriptor size define
   */
-#define USBD_CDC_CONFIG_DESC_SIZE        67
+#define USBD_CDC_CONFIG_DESC_SIZE        141
 #define USBD_CDC_SIZ_STRING_LANGID       4
 #define USBD_CDC_SIZ_STRING_SERIAL       0x1A
 

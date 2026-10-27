@@ -19,6 +19,12 @@ extern "C"
     uint8_t INC_Machine_Stop(void);
     uint8_t INC_Machine_Get_Count(float *angleReq, float *CurrentAngle);
     uint8_t INC_Machine_Manual_Ctrl(int8_t direction, uint8_t inc_dir);
+    typedef enum {
+        INC_RESULT_OK = 0, INC_RESULT_MOVING, INC_RESULT_STOPPED,
+        INC_RESULT_SENSOR, INC_RESULT_OVERCURRENT, INC_RESULT_TIMEOUT,
+        INC_RESULT_STALLED
+    } INC_Result;
+    INC_Result INC_Machine_Get_Result(void);
     
 #ifdef __cplusplus
 }

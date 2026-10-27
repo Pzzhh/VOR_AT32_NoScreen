@@ -1,5 +1,5 @@
-#ifndef __control_VOR_H_
-#define __control_VOR_H_
+#ifndef __JY60_H_
+#define __JY60_H_
 #include "stdint.h"
 #ifdef __cplusplus
 extern "C"
@@ -8,6 +8,7 @@ extern "C"
     
     void JY60_Init(void);
     uint8_t JY60_Get_Inc(float *angle);
+    uint8_t JY60_Get_Inc_Fresh(float *angle, uint32_t max_age_ms);
 
 #ifdef __cplusplus
 }

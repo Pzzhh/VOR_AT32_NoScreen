@@ -30,6 +30,7 @@ class AppConfig:
     data_dir: str = "data"
     template_limit: int = 5
     history_limit: int = 20
+    telemetry: Optional[SerialConfig] = None
 
 
 def default_config_path() -> Path:
@@ -52,6 +53,7 @@ def load_config(path: Optional[Path] = None) -> AppConfig:
         data_dir=data_dir,
         template_limit=int(raw.get("template_limit", 5)),
         history_limit=int(raw.get("history_limit", 20)),
+        telemetry=SerialConfig(**raw.get("telemetry", {"port": ""})),
     )
     if config.serial.baudrate <= 0:
         raise ValueError("serial.baudrate must be positive")

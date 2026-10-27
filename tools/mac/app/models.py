@@ -74,6 +74,10 @@ class SerialPortInput(BaseModel):
     port: str = Field(min_length=1, max_length=256)
 
 
+class OptionalSerialPortInput(BaseModel):
+    port: str = Field(default="", max_length=256)
+
+
 @dataclass
 class VorTask:
     id: int

@@ -41,6 +41,8 @@ def test_websocket_delivers_snapshot() -> None:
             assert message["type"] == "snapshot"
             assert message["data"]["run"]["state"] == "IDLE"
             assert message["data"]["serial"]["connected"] is False
+            assert message["data"]["telemetry"]["connected"] is False
+            assert message["telemetry"] == []
 
 
 def test_serial_port_can_be_listed_and_selected() -> None:
@@ -50,3 +52,38 @@ def test_serial_port_can_be_listed_and_selected() -> None:
         selected = client.put("/api/serial/port", json={"port": "COM7"})
         assert selected.status_code == 200
         assert selected.json()["data"]["port"] == "COM7"
+        telemetry = client.put("/api/telemetry/port", json={"port": "COM8"})
+        assert telemetry.status_code == 200
+        assert telemetry.json()["data"]["port"] == "COM8"
+
+
+def test_command_and_telemetry_ports_must_differ() -> None:
+    with make_client() as client:
+        client.put("/api/serial/port", json={"port": "COM7"})
+        response = client.put("/api/telemetry/port", json={"port": "COM7"})
+        assert response.status_code == 503
+
+
+def test_cdc2_can_be_cleared_and_command_connected_alone() -> None:
+    with make_client() as client:
+        client.put("/api/serial/port", json={"port": "COM7"})
+        client.put("/api/telemetry/port", json={"port": "COM8"})
+        cleared = client.put("/api/telemetry/port", json={"port": ""})
+        assert cleared.status_code == 200
+        assert cleared.json()["data"]["port"] == ""
+
+        with patch("app.serial_client.SerialClient.connect") as command_connect, \
+                patch("app.telemetry_client.TelemetryClient.connect") as telemetry_connect:
+            response = client.post("/api/serial/connect")
+        assert response.status_code == 200
+        command_connect.assert_called_once_with()
+        telemetry_connect.assert_not_called()
+
+
+def test_telemetry_csv_download() -> None:
+    with make_client() as client:
+        response = client.get("/api/telemetry/csv")
+        assert response.status_code == 200
+        assert response.content.startswith(
+            b"\xef\xbb\xbftimestamp,sequence,packet_sequence,speed_1,speed_2,flash"
+        )

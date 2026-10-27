@@ -51,6 +51,9 @@ extern "C" {
 #define USBD_CDC_INT_EPT                 0x82
 #define USBD_CDC_BULK_IN_EPT             0x81
 #define USBD_CDC_BULK_OUT_EPT            0x01
+#define USBD_CDC2_INT_EPT                 0x84
+#define USBD_CDC2_BULK_IN_EPT             0x83
+#define USBD_CDC2_BULK_OUT_EPT            0x03
 
 /**
   * @brief usb cdc in and out max packet size define
@@ -72,13 +75,14 @@ extern "C" {
   */
 typedef struct
 {
-  uint32_t alt_setting;
-  uint8_t g_rx_buff[USBD_CDC_OUT_MAXPACKET_SIZE];
-  uint8_t g_cmd[USBD_CDC_CMD_MAXPACKET_SIZE];
-  uint8_t g_req;
-  uint16_t g_len, g_rxlen;
-  __IO uint8_t g_tx_completed, g_rx_completed;
-  linecoding_type linecoding;
+  uint32_t alt_setting[2];
+  uint8_t g_rx_buff[2][USBD_CDC_OUT_MAXPACKET_SIZE];
+  uint8_t g_cmd[2][USBD_CDC_CMD_MAXPACKET_SIZE];
+  uint8_t g_req[2];
+  uint8_t control_port;
+  uint16_t g_len[2], g_rxlen[2];
+  __IO uint8_t g_tx_completed[2], g_rx_completed[2];
+  linecoding_type linecoding[2];
 }cdc_struct_type;
 
 
@@ -95,6 +99,9 @@ error_status usb_vcp_send_data(void *udev, uint8_t *send_data, uint16_t len);
 error_status usb_vcp_send_data_force(void *udev, uint8_t *send_data, uint16_t len);
 uint8_t usb_vcp_tx_completed(void *udev);
 uint8_t usb_vcp_rx_completed(void *udev);
+uint16_t usb_vcp_get_rxdata_ch(void *udev, uint8_t channel, uint8_t *recv_data);
+error_status usb_vcp_send_data_ch(void *udev, uint8_t channel, uint8_t *send_data, uint16_t len);
+uint8_t usb_vcp_tx_completed_ch(void *udev, uint8_t channel);
 
 /**
   * @}

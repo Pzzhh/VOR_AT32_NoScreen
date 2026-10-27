@@ -3,8 +3,8 @@
  * @Date: 2024-07-25 14:38:15
  * @LastEditors: pzzhh2 101804901+Pzzhh@users.noreply.github.com
  * @LastEditTime: 2025-08-13 15:27:14
- * @FilePath: \USERd:\workfile\ÏîÄ¿3 vor\software\VOR_V2.0\INTERFACE\UI\control\control_Hardware_API.h
- * @Description: ÕâÊÇÄ¬ÈÏÉèÖÃ,ÇëÉèÖÃ`customMade`, ´ò¿ªkoroFileHeader²é¿´ÅäÖÃ ½øÐÐÉèÖÃ: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ * @FilePath: \USERd:\workfile\ï¿½ï¿½Ä¿3 vor\software\VOR_V2.0\INTERFACE\UI\control\control_Hardware_API.h
+ * @Description: ï¿½ï¿½ï¿½ï¿½Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½`customMade`, ï¿½ï¿½koroFileHeaderï¿½é¿´ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #ifndef __control_Hardware_API_H_
 #define __control_Hardware_API_H_
@@ -75,6 +75,7 @@ extern "C"
 	uint8_t HAL_CAM_SET_Led_Voltage(uint16_t Millivol);
 	uint8_t HAL_Beep_Enable(uint32_t ms);
 	uint8_t HAL_IMU_GET_Angle(float* angle);
+	uint8_t HAL_Encode_GET_angle(float* angle);
 	uint8_t HAL_Encode_GET_angle(float* angle);
 
 	// uint8_t HAL_Control_Get_Start_Cmd(Start_Cmd_Type *cmd);

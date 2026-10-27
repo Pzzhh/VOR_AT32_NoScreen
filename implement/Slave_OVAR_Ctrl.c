@@ -133,6 +133,7 @@ uint8_t OVAR_Machine_Init(float vel, uint32_t MillSec)
     ovar_para.MillSecReq = MillSec;
     ovar_para.Tick = 0;
     ovar_para.accTimer = 0;
+    ovar_para.ReqPause = 0;
     ovar_para.state = running | IO_ready;
     Slave1_Step_Generator_Init(50000, 10);
     Slave1_Set_Machine_Cb(OVAR_handler);
@@ -143,9 +144,10 @@ uint8_t OVAR_Machine_Init(float vel, uint32_t MillSec)
 uint8_t OVAR_Machine_Stop(void)
 {
     if (ovar_para.state == end)
-        return 0;
+        return 1;
+    ovar_para.ReqPause = 0;
     ovar_para.state = back;
-    return 0;
+    return 1;
 }
 
 uint8_t OVAR_Machine_Pause(void)

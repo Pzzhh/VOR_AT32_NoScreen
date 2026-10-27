@@ -37,7 +37,7 @@ extern "C"
     void tim_f_sin_set(int f);
     void tim_f_sin_set_Dir(int f);
 		uint8_t Slave1_get_Encode_error();
-		uint8_t Slave1_Check_Encode_Angle();
+		uint8_t Slave1_Check_Encode_Angle(uint8_t isCheck);
     void tim_f_set(int f);
     void Slave_server_Init(void);
     float Slave1_Get_Encode_Angle(void);

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VOR / OVAR Control</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><span class="logo">VOR / OVAR</span><span class="subtitle">USB Control</span></div>
+    <div class="connection">
+      <span id="connectionDot" class="dot"></span>
+      <span id="connectionText" data-i18n="disconnected">Disconnected</span>
+      <span id="portText" class="muted"></span>
+      <label class="port-picker"><span class="sr-only">Command port</span><select id="portSelect" aria-label="Command serial port"><option value="">Command port</option></select></label>
+      <label class="port-picker"><span class="sr-only">Telemetry port (optional)</span><select id="telemetryPortSelect" aria-label="Optional telemetry serial port"><option value="">No CDC2 (optional)</option></select></label>
+      <button id="refreshPortsButton" class="ghost" title="Refresh serial ports">↻</button>
+      <button id="connectButton" class="secondary" data-i18n="connect">Connect</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel tasks-panel">
+      <div class="section-tabs"><button class="tab active" data-view="tasks" data-i18n="tasks">Tasks</button><button class="tab" data-view="templates" data-i18n="templates">Templates</button><button class="tab" data-view="history" data-i18n="history">History</button></div>
+      <div id="tasksView" class="side-view active">
+        <div class="panel-title"><div><h2 data-i18n="taskList">Task list</h2><span id="taskCount">0 / 20</span></div><div class="toolbar"><button id="arrangeButton" class="secondary" data-i18n="arrange">Arrange</button><button id="arrangeSave" class="hidden" data-i18n="save">Save</button><button id="arrangeCancel" class="secondary hidden" data-i18n="cancel">Cancel</button><button id="newTask" data-i18n="add">+ Add</button></div></div>
+        <div id="taskList" class="task-list"><div class="empty">No tasks yet</div></div>
+      </div>
+      <div id="templatesView" class="side-view">
+        <div class="panel-title"><h2 data-i18n="templates">Templates</h2><div class="toolbar"><button id="saveTemplate" data-i18n="saveTemplate">Save current</button><button id="uploadTemplate" class="secondary" data-i18n="upload">Upload</button><input id="templateFile" type="file" accept="application/json,.json" hidden></div></div>
+        <div id="templateList" class="task-list"></div>
+      </div>
+      <div id="historyView" class="side-view">
+        <div class="panel-title"><h2 data-i18n="history">History</h2><button id="clearHistory" class="danger" data-i18n="clearAll">Clear all</button></div>
+        <div id="historyList" class="task-list"></div>
+      </div>
+    </section>
+
+    <section class="right-column">
+      <section class="panel progress-panel">
+        <div class="run-heading">
+          <div><span class="eyebrow">CURRENT TASK</span><h1 id="currentName">Waiting</h1><p id="currentParams" class="muted">Add a task to begin</p></div>
+          <span id="runState" class="state-pill">IDLE</span>
+        </div>
+        <div class="progress-wrap"><div id="progressBar" class="progress-bar"></div></div>
+        <div class="progress-meta"><strong id="progressText">0%</strong><span id="remainingText">Remaining 0</span></div>
+        <div class="encoder-summary">
+          <div class="encoder-reading"><span>Turntable speed · speed_1</span><strong id="encoderSpeed">--</strong><span>°/s</span></div>
+          <div class="encoder-reading"><span>CAN angle · speed_2</span><strong id="canAngle">--</strong><span>°</span></div>
+          <div class="encoder-reading"><span>Flash</span><strong id="flashState">--</strong></div>
+          <span id="telemetryState" class="telemetry-state">Telemetry disconnected</span>
+        </div>
+        <div class="chart-wrap"><canvas id="encoderChart" aria-label="Real-time encoder and CAN motor telemetry chart"></canvas></div>
+        <p id="runMessage" class="run-message">ready</p>
+        <div class="controls">
+          <button id="startButton" data-i18n="startQueue">Start queue</button>
+          <button id="pauseButton" class="secondary" data-i18n="pause">Pause</button>
+          <button id="resumeButton" class="secondary" data-i18n="resume">Resume</button>
+          <button id="stopButton" class="danger" data-i18n="stop">Stop</button>
+          <button id="retryButton" class="warning" data-i18n="retry">Retry</button>
+          <button id="skipButton" class="secondary" data-i18n="skip">Skip</button>
+          <a id="saveTelemetryCsv" class="button secondary" href="/api/telemetry/csv" download>Save encoder CSV</a>
+        </div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-title"><div><h2 data-i18n="usbLog">USB communication</h2><span data-i18n="live">Live</span></div><button id="clearLogs" class="ghost" data-i18n="clearView">Clear view</button></div>
+        <div id="logList" class="logs"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="taskDialog">
+    <form id="taskForm" method="dialog">
+      <div class="dialog-title"><h2 id="dialogTitle">Add VOR task</h2><button type="button" id="closeDialog" class="ghost">×</button></div>
+      <input id="taskId" type="hidden">
+      <label>Mode<select id="taskMode"><option value="VOR">VOR</option><option value="OVAR">OVAR</option></select></label>
+      <div class="form-grid">
+        <label class="vor-field">Count C<input id="count" type="number" min="1" max="1000" value="20"></label>
+        <label>Velocity V<input id="velocity" type="number" required min="-360" max="360" step="0.1" value="50"></label>
+        <label class="vor-field">Frequency F<input id="frequency" type="number" min="0.1" max="11" step="0.1" value="1.6"></label>
+        <label class="vor-field">Extended mode E<select id="exMode"><option value="0">VOR</option><option value="1">OKR</option><option value="2">BOTH</option><option value="3">BOTH_R</option></select></label>
+        <label class="ovar-field hidden">Duration S (seconds)<input id="seconds" type="number" min="1" max="1000" value="60"></label>
+        <label class="ovar-field hidden">Incline A (degrees)<input id="inclineDegree" type="number" min="0" max="50" step="0.1" value="15"></label>
+      </div>
+      <div class="dialog-actions"><button type="button" id="cancelDialog" class="secondary">Cancel</button><button type="submit">Save task</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast"></div>
+  <div id="taskContextMenu" class="context-menu hidden">
+    <button id="runOnlyTask">Run only this task</button>
+    <button id="runFromTask">Start from this task</button>
+  </div>
+  <script src="/static/app_v2.js"></script>
+</body>
+</html>

@@ -38,6 +38,9 @@ typedef enum {
     CONTROL_RESULT_RESUME_FAILED = 2004,
     CONTROL_RESULT_STOP_FAILED = 2005,
     CONTROL_RESULT_TIMEOUT = 2006,
+    CONTROL_RESULT_SENSOR_STALE = 2007,
+    CONTROL_RESULT_OVERCURRENT = 2008,
+    CONTROL_RESULT_NO_PROGRESS = 2009,
     CONTROL_RESULT_CANCELLED = 3001,
     CONTROL_RESULT_INTERNAL_ERROR = 9001
 } Control_Result;
@@ -68,6 +71,9 @@ typedef struct {
     uint8_t (*next)(void);
     void (*on_tick)(Task_control_info *control);
     uint16_t poll_interval_ms;
+    /* Optional terminal result/feedback (INC must not treat faults as finish). */
+    Control_Result (*get_result)(void);
+    uint8_t (*get_angle)(float *angle);
 } Control_Driver;
 
 void Control_Preview_Init(void);

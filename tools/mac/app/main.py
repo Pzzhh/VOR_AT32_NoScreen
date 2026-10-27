@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -11,11 +14,13 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .config import AppConfig
-from .models import (ReorderInput, StartRunInput, TemplateCreateInput,
-                     TemplateImportInput, SerialPortInput, VorTaskInput, api_result)
+from .models import (OptionalSerialPortInput, ReorderInput, SerialPortInput,
+                     StartRunInput, TemplateCreateInput, TemplateImportInput,
+                     VorTaskInput, api_result)
 from .scheduler import SchedulerError, TaskScheduler
 from .serial_client import SerialClient, SerialClientError
 from .storage import HistoryStore, TemplateStore
+from .telemetry_client import TelemetryClient
 
 
 class HostService:
@@ -27,15 +32,19 @@ class HostService:
         self.history = HistoryStore(data_dir / "history.json",
                                     config.history_limit)
         self.serial = SerialClient(config.serial, config.log_limit)
+        self.telemetry = TelemetryClient(config.telemetry or
+                                         type(config.serial)(port=""))
         self.scheduler = TaskScheduler(self.serial, self.history)
 
     def close(self) -> None:
         self.scheduler.close()
         self.serial.close()
+        self.telemetry.close()
 
     def snapshot(self) -> Dict[str, Any]:
         return {
             "serial": self.serial.snapshot(),
+            "telemetry": self.telemetry.snapshot(),
             "run": self.scheduler.snapshot(),
             "storage": {"template_count": len(self.templates.list()),
                         "history_count": len(self.history.list()),
@@ -95,6 +104,10 @@ def create_app(config: AppConfig) -> FastAPI:
                 "run_timeout_seconds": config.serial.run_timeout_seconds,
                 "reconnect_interval_seconds": config.serial.reconnect_interval_seconds,
             },
+            "telemetry": {
+                "port": service.telemetry.config.port,
+                "baudrate": service.telemetry.config.baudrate,
+            },
             "web": {"host": config.web.host, "port": config.web.port},
             "task_limit": TaskScheduler.MAX_TASKS,
             "template_limit": config.template_limit,
@@ -103,12 +116,18 @@ def create_app(config: AppConfig) -> FastAPI:
 
     @app.post("/api/serial/connect")
     async def serial_connect() -> Dict[str, Any]:
+        if service.telemetry.config.port:
+            if service.telemetry.config.port == service.serial.config.port:
+                raise SerialClientError("command and telemetry ports must be different")
         service.serial.connect()
+        if service.telemetry.config.port:
+            service.telemetry.connect()
         return api_result(service.serial.snapshot())
 
     @app.post("/api/serial/disconnect")
     async def serial_disconnect() -> Dict[str, Any]:
         service.serial.disconnect()
+        service.telemetry.disconnect()
         return api_result(service.serial.snapshot())
 
     @app.get("/api/serial/ports")
@@ -119,6 +138,38 @@ def create_app(config: AppConfig) -> FastAPI:
     async def select_serial_port(data: SerialPortInput) -> Dict[str, Any]:
         service.serial.select_port(data.port)
         return api_result(service.serial.snapshot())
+
+    @app.put("/api/telemetry/port")
+    async def select_telemetry_port(data: OptionalSerialPortInput) -> Dict[str, Any]:
+        if data.port and data.port == service.serial.config.port:
+            raise SerialClientError("command and telemetry ports must be different")
+        try:
+            service.telemetry.select_port(data.port)
+        except RuntimeError as error:
+            raise SerialClientError(str(error))
+        return api_result(service.telemetry.snapshot())
+
+    @app.get("/api/telemetry/csv")
+    async def download_telemetry_csv() -> Response:
+        output = io.StringIO(newline="")
+        writer = csv.writer(output)
+        writer.writerow(["timestamp", "sequence", "packet_sequence",
+                         "speed_1", "speed_2", "flash"])
+        for sample in service.telemetry.samples_snapshot():
+            timestamp = datetime.fromtimestamp(
+                sample["timestamp"], tz=timezone.utc
+            ).astimezone().isoformat(timespec="milliseconds")
+            writer.writerow([timestamp, sample["sequence"],
+                             sample["packet_sequence"],
+                             f'{sample["speed"]:.1f}',
+                             f'{sample["can_position"]:.1f}',
+                             sample["flash"]])
+        filename = datetime.now().strftime("encoder_%Y%m%d_%H%M%S.csv")
+        return Response(
+            content="\ufeff" + output.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     @app.get("/api/tasks")
     async def tasks() -> Dict[str, Any]:
@@ -263,15 +314,20 @@ def create_app(config: AppConfig) -> FastAPI:
     async def events(websocket: WebSocket) -> None:
         await websocket.accept()
         sequence = 0
+        telemetry_sequence = 0
         try:
             while True:
                 logs = service.serial.logs_after(sequence)
                 if logs:
                     sequence = logs[-1]["sequence"]
+                samples = service.telemetry.samples_after(telemetry_sequence)
+                if samples:
+                    telemetry_sequence = samples[-1]["sequence"]
                 await websocket.send_json({
                     "type": "snapshot",
                     "data": service.snapshot(),
                     "logs": logs,
+                    "telemetry": samples,
                 })
                 await asyncio.sleep(0.25)
         except WebSocketDisconnect:

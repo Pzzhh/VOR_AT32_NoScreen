@@ -15,6 +15,9 @@
 !*.S
 !*.sh
 !*.py
+!tools/mac/app/static/*.html
+!tools/mac/app/static/*.css
+!tools/mac/app/static/*.js
 
 # Build and IDE project definitions (not generated build output)
 !CMakeLists.txt
@@ -71,3 +74,6 @@ tools/mac/.venv/
 tools/mac/data/
 tools/mac/**/__pycache__/
 tools/mac/**/*.pyc
+tools/mac/.pytest_cache/
+tools/mac/build/
+tools/mac/dist/

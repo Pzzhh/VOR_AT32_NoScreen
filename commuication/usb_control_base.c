@@ -28,6 +28,25 @@ static uint32_t USB_Initial_Remaining(const Task_Parameter_Struct *task)
     }
 }
 
+static uint8_t USB_Is_Rotation_Mode(Task_Parameter_Mode_enum mode)
+{
+    return mode == Task_VOR || mode == Task_Continue ||
+           mode == Task_OVAR || mode == Task_VHIT || mode == Task_TC;
+}
+
+static uint8_t USB_Wait_Machine(const Control_Driver *driver, uint8_t target,
+                                uint32_t *remaining, uint32_t *percent)
+{
+    uint32_t started = ControlGetTick();
+    do {
+        if (driver->get_state(remaining, percent) == target)
+            return 1;
+        if ((uint32_t)(ControlGetTick() - started) >= 3000U)
+            return 0;
+        SaftExitDelay(10, 0);
+    } while (1);
+}
+
 Control_Result USB_Control_Run(Task_Parameter_Struct *task,
                                Task_control_info *control,
                                const Control_Driver *driver)
@@ -40,17 +59,15 @@ Control_Result USB_Control_Run(Task_Parameter_Struct *task,
     uint32_t percent = 0;
     int32_t last_remaining = -1;
     uint16_t poll_ms;
-    uint32_t encoder_tick;
-    float encoder_angle;
 
     if (task == 0 || control == 0 || !USB_Driver_Is_Valid(driver))
         return CONTROL_RESULT_INVALID_ARGUMENT;
     if (!USB_VOR_Task_Take_Start(&start_command))
         return CONTROL_RESULT_INVALID_STATE;
+    USB_VOR_Task_Set_Request(start_command.id);
 
     poll_ms = driver->poll_interval_ms != 0 ? driver->poll_interval_ms : 50U;
     remaining = USB_Initial_Remaining(task);
-    encoder_tick = ControlGetTick();
     control->UI_para.state = taskinit;
     control->State_Bit.reqPause = 0;
     control->State_Bit.isPause = 0;
@@ -75,12 +92,15 @@ Control_Result USB_Control_Run(Task_Parameter_Struct *task,
                         "RECORD_DELAY_BYPASSED", 0, remaining);
 
     if (!driver->start(task)) {
+        Control_Result failure = driver->get_result != 0 ? driver->get_result() : CONTROL_RESULT_START_FAILED;
+        if (failure == CONTROL_RESULT_OK)
+            failure = CONTROL_RESULT_START_FAILED;
         control->UI_para.state = taskTerminal;
-        USB_VOR_Task_Reply(&start_command, 0, CONTROL_RESULT_START_FAILED,
+        USB_VOR_Task_Reply(&start_command, 0, failure,
                            "START_FAILED");
-        USB_VOR_Task_Update(USB_VOR_STATE_ERROR, CONTROL_RESULT_START_FAILED,
+        USB_VOR_Task_Update(USB_VOR_STATE_ERROR, failure,
                             "ERROR", 0, remaining);
-        return CONTROL_RESULT_START_FAILED;
+        return failure;
     }
 
     control->State_Bit.IsRunning = 1;
@@ -88,6 +108,11 @@ Control_Result USB_Control_Run(Task_Parameter_Struct *task,
     USB_VOR_Task_Reply(&start_command, 1, CONTROL_RESULT_OK, "STARTED");
     USB_VOR_Task_Update(USB_VOR_STATE_RUNNING, CONTROL_RESULT_OK,
                         "MOTOR_START", 0, remaining);
+    if (USB_Is_Rotation_Mode(task->mode)) {
+        HAL_CAM_SET_sign_led();
+        SaftExitDelay(50, 0);
+        HAL_CAM_SET_sign_led();
+    }
     USB_VOR_Task_Update(USB_VOR_STATE_RUNNING, CONTROL_RESULT_OK,
                         "RUNNING", 0, remaining);
 
@@ -101,7 +126,8 @@ Control_Result USB_Control_Run(Task_Parameter_Struct *task,
                 }
                 USB_VOR_Task_Update(USB_VOR_STATE_RUNNING, CONTROL_RESULT_OK,
                                     "PAUSING", percent, remaining);
-                if (!driver->pause(1)) {
+                if (!driver->pause(1) || (task->mode == Task_OVAR &&
+                    !USB_Wait_Machine(driver, Imp_paused, &remaining, &percent))) {
                     USB_VOR_Task_Reply(&command, 0,
                                        CONTROL_RESULT_PAUSE_FAILED,
                                        "PAUSE_FAILED");
@@ -147,7 +173,8 @@ Control_Result USB_Control_Run(Task_Parameter_Struct *task,
                 USB_VOR_Task_Update(USB_VOR_STATE_STOPPING,
                                     CONTROL_RESULT_CANCELLED, "STOPPING",
                                     percent, remaining);
-                if (!driver->stop()) {
+                if (!driver->stop() || ((task->mode == Task_OVAR || task->mode == Task_Incline) &&
+                    !USB_Wait_Machine(driver, Imp_finsih, &remaining, &percent))) {
                     USB_VOR_Task_Reply(&command, 0,
                                        CONTROL_RESULT_STOP_FAILED,
                                        "STOP_FAILED");
@@ -198,6 +225,15 @@ Control_Result USB_Control_Run(Task_Parameter_Struct *task,
         }
 
         machine_state = driver->get_state(&remaining, &percent);
+        if (driver->get_result != 0) {
+            Control_Result result = driver->get_result();
+            if (result != CONTROL_RESULT_OK) {
+                driver->stop();
+                control->UI_para.state = taskTerminal;
+                USB_VOR_Task_Update(USB_VOR_STATE_ERROR, result, "ERROR", percent, remaining);
+                return result;
+            }
+        }
         if (percent > 100U)
             percent = 100U;
         if (!paused && machine_state == Imp_running &&
@@ -205,11 +241,6 @@ Control_Result USB_Control_Run(Task_Parameter_Struct *task,
             last_remaining = (int32_t)remaining;
             USB_VOR_Task_Update(USB_VOR_STATE_RUNNING, CONTROL_RESULT_OK,
                                 "PROGRESS", percent, remaining);
-        }
-        if ((uint32_t)(ControlGetTick() - encoder_tick) >= 1000U) {
-            encoder_tick = ControlGetTick();
-            if (HAL_Encode_GET_angle(&encoder_angle))
-                USB_VOR_Task_Update_Encoder(encoder_angle, percent, remaining);
         }
         if (machine_state == Imp_finsih) {
             control->UI_para.state = taskend;

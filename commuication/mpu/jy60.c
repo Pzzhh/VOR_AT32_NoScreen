@@ -10,6 +10,7 @@
 #include "math.h"
 #include "string.h"
 #include "stdio.h"
+#include "../INTERFACE/UI/other/system_function.h"
 #ifdef ATM32F43_xx
  #include "..\HARDWARE\USART\USART5.h"
 
@@ -17,6 +18,8 @@
 
 
 static uint8_t isupdata;
+static volatile uint8_t angle_received;
+static volatile uint32_t angle_tick;
 
 struct
 {
@@ -35,7 +38,7 @@ typedef struct
 struct
 {
 	jy60_data data;
-	float inc;
+	volatile float inc;
 	uint8_t(*handle)();
 } jy60;
 
@@ -113,6 +116,8 @@ void jy60_decode(uint8_t dr)
 
 		memcpy(&jy60_orginal, &bytes[2], sizeof(jy60_orginal));
 		jy60_Calculate();
+		angle_tick = ControlGetTick();
+		angle_received = 1;
 
 		break;
 	default:
@@ -138,6 +143,15 @@ uint8_t JY60_Get_Inc(float* angle)
 float JY60_Get_IncAsync()
 {
 	return jy60.inc;
+}
+
+uint8_t JY60_Get_Inc_Fresh(float *angle, uint32_t max_age_ms)
+{
+    if (!angle_received || (uint32_t)(ControlGetTick() - angle_tick) > max_age_ms)
+        return 0;
+    if (angle != 0)
+        *angle = jy60.inc;
+    return 1;
 }
 
 void JY60_Init(void)

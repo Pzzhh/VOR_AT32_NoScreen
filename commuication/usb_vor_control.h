@@ -57,6 +57,7 @@ void USB_VOR_Task_Update(USB_VOR_State state, Control_Result result,
 void USB_VOR_Task_Update_Encoder(float angle, uint32_t progress,
                                  uint32_t remaining);
 void USB_VOR_Task_Set_Mode(Task_Parameter_Mode_enum mode);
+void USB_VOR_Task_Set_Request(uint32_t id);
 void USB_VOR_Task_Reset(void);
 
 #ifdef __cplusplus

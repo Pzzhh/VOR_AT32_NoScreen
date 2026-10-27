@@ -73,7 +73,7 @@ uint8_t HAL_Incline_Init(float angle, uint32_t time)
 	inc_info.Setangle = angle;
 #ifdef ATM32F43_xx
 	extern uint8_t inc_dir_g;
-	INC_Machine_Init(angle, 0, inc_dir_g);
+	return INC_Machine_Init(angle, 0, inc_dir_g);
 
 #endif
 	return 1;

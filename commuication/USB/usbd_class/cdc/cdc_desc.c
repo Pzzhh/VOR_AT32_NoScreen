@@ -88,9 +88,9 @@ ALIGNED_HEAD static uint8_t g_usbd_descriptor[USB_DEVICE_DESC_LEN] ALIGNED_TAIL 
   USB_DESCIPTOR_TYPE_DEVICE,             /* bDescriptorType */
   0x00,                                  /* bcdUSB */
   0x02,
-  0x02,                                  /* bDeviceClass */
-  0x00,                                  /* bDeviceSubClass */
-  0x00,                                  /* bDeviceProtocol */
+  0xEF,                                  /* bDeviceClass: miscellaneous/composite */
+  0x02,                                  /* bDeviceSubClass: common class */
+  0x01,                                  /* bDeviceProtocol: interface association */
   USB_MAX_EP0_SIZE,                      /* bMaxPacketSize */
   LBYTE(USBD_CDC_VENDOR_ID),             /* idVendor */
   HBYTE(USBD_CDC_VENDOR_ID),             /* idVendor */
@@ -116,12 +116,14 @@ ALIGNED_HEAD static uint8_t g_usbd_configuration[USBD_CDC_CONFIG_DESC_SIZE] ALIG
   USB_DESCIPTOR_TYPE_CONFIGURATION,      /* bDescriptorType: configuration */
   LBYTE(USBD_CDC_CONFIG_DESC_SIZE),          /* wTotalLength: bytes returned */
   HBYTE(USBD_CDC_CONFIG_DESC_SIZE),          /* wTotalLength: bytes returned */
-  0x02,                                  /* bNumInterfaces: 2 interface */
+  0x04,                                  /* bNumInterfaces: two CDC functions */
   0x01,                                  /* bConfigurationValue: configuration value */
   0x00,                                  /* iConfiguration: index of string descriptor describing
                                             the configuration */
   0xC0,                                  /* bmAttributes: self powered */
   0x32,                                  /* MaxPower 100 mA: this current is used for detecting vbus */
+
+  0x08, 0x0B, 0x00, 0x02, USB_CLASS_CODE_CDC, 0x02, 0x01, 0x00,
 
   USB_DEVICE_IF_DESC_LEN,                /* bLength: interface descriptor size */
   USB_DESCIPTOR_TYPE_INTERFACE,          /* bDescriptorType: interface descriptor type */
@@ -190,6 +192,28 @@ ALIGNED_HEAD static uint8_t g_usbd_configuration[USBD_CDC_CONFIG_DESC_SIZE] ALIG
   LBYTE(USBD_CDC_OUT_MAXPACKET_SIZE),
   HBYTE(USBD_CDC_OUT_MAXPACKET_SIZE),        /* wMaxPacketSize: maximum packe size this endpoint */
   0x00,                                  /* bInterval: interval for polling endpoint for data transfers */
+
+  /* CDC2 interface association: control interface 2, data interface 3. */
+  0x08, 0x0B, 0x02, 0x02, USB_CLASS_CODE_CDC, 0x02, 0x01, 0x00,
+  USB_DEVICE_IF_DESC_LEN, USB_DESCIPTOR_TYPE_INTERFACE,
+  0x02, 0x00, 0x01, USB_CLASS_CODE_CDC, 0x02, 0x01, 0x00,
+  0x05, USBD_CDC_CS_INTERFACE, USBD_CDC_SUBTYPE_HEADER,
+  LBYTE(CDC_BCD_NUM), HBYTE(CDC_BCD_NUM),
+  0x05, USBD_CDC_CS_INTERFACE, USBD_CDC_SUBTYPE_CMF, 0x00, 0x03,
+  0x04, USBD_CDC_CS_INTERFACE, USBD_CDC_SUBTYPE_ACM, 0x02,
+  0x05, USBD_CDC_CS_INTERFACE, USBD_CDC_SUBTYPE_UFD, 0x02, 0x03,
+  USB_DEVICE_EPT_LEN, USB_DESCIPTOR_TYPE_ENDPOINT,
+  USBD_CDC2_INT_EPT, USB_EPT_DESC_INTERRUPT,
+  LBYTE(USBD_CDC_CMD_MAXPACKET_SIZE), HBYTE(USBD_CDC_CMD_MAXPACKET_SIZE),
+  CDC_HID_BINTERVAL_TIME,
+  USB_DEVICE_IF_DESC_LEN, USB_DESCIPTOR_TYPE_INTERFACE,
+  0x03, 0x00, 0x02, USB_CLASS_CODE_CDCDATA, 0x00, 0x00, 0x00,
+  USB_DEVICE_EPT_LEN, USB_DESCIPTOR_TYPE_ENDPOINT,
+  USBD_CDC2_BULK_IN_EPT, USB_EPT_DESC_BULK,
+  LBYTE(USBD_CDC_IN_MAXPACKET_SIZE), HBYTE(USBD_CDC_IN_MAXPACKET_SIZE), 0x00,
+  USB_DEVICE_EPT_LEN, USB_DESCIPTOR_TYPE_ENDPOINT,
+  USBD_CDC2_BULK_OUT_EPT, USB_EPT_DESC_BULK,
+  LBYTE(USBD_CDC_OUT_MAXPACKET_SIZE), HBYTE(USBD_CDC_OUT_MAXPACKET_SIZE), 0x00,
 };
 
 /**

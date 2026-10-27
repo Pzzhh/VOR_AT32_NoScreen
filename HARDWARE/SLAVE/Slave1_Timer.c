@@ -93,7 +93,7 @@ void SRV1_Encoder_Init()
     TMR2->cm1_input_bit.c2df = 0;
     TMR2->cm1_input_bit.c1c = 2;
     TMR2->cm1_input_bit.c2c = 2;
-    tmr_base_init(TMR2, 1073741, 0);
+    tmr_base_init(TMR2, 0xffffffff, 0);
     TMR2->ctrl1_bit.tmren = 1;
 
     GPIOA->cfgr_bit.iomc5 = 2;
@@ -352,18 +352,18 @@ void Slave1_Set_Encode(uint32_t cnt)
 
 int32_t count_record;
 int8_t isEncode_error = 0;
-uint8_t Slave1_Check_Encode_Angle()
+uint8_t Slave1_Check_Encode_Angle(uint8_t isCheck)
 {
-    static uint8_t flag = 0;
+    // static uint8_t flag = 0;
     int32_t count = *(int32_t *)&(TMR2->cval);
 
-    if (flag == 0)
+    if (isCheck == 0)
     {
         count_record = count;
-        flag = 1;
+        isEncode_error = 0;
         return 0;
     }
-    if (flag == 1)
+    if (isCheck == 1)
     {
         int absvalue = abs(count_record - count);
         if (absvalue < 10)
@@ -378,15 +378,16 @@ uint8_t Slave1_Check_Encode_Angle()
 
 float Slave1_Get_Encode_Angle()
 {
-    //    if (isEncode_error)
-    // {
-    //     return soft_angle_CNT;
-    // }
-    int32_t count = *(int32_t *)&(TMR2->cval);
-    count = count - 1073741 / 2;
+	//  return 1;
+//    if (isEncode_error)
+//    {
+       return soft_angle_CNT;
+//    }
+    //    int32_t count = *(int32_t *)&(TMR2->cval);
+    //    count = count - 1073741 / 2;
     float angle = 0;
-	angle=Slave1_Get_Encode_Angle_real();
-    return angle+soft_angle_CNT;
+    angle = Slave1_Get_Encode_Angle_real();
+    return angle;
 }
 
 float Slave1_Get_Encode_Angle_real()
@@ -394,7 +395,8 @@ float Slave1_Get_Encode_Angle_real()
 
     int32_t count = *(int32_t *)&(TMR2->cval);
     count = count;
-    float angle = count / 400000 * 360.0f;
+    float angle = count;
+    angle = angle / 400000 * 360.0f;
     return angle;
 }
 

@@ -82,9 +82,14 @@ uint8_t hal_Slave_OVAR_Get_State(uint32_t *remainingSec, uint32_t *parcent)
 #else
 	uint32_t counterReq = 0, CurrentCount = 0;
 	uint8_t res = OVAR_Machine_Get_Count(&counterReq, &CurrentCount);
+	if (res == Imp_finsih) {
+		if (parcent != 0) *parcent = 100;
+		*remainingSec = 0;
+		return res;
+	}
 	if (parcent != 0)
-		*parcent = CurrentCount * 100 / counterReq;
-	*remainingSec = counterReq - CurrentCount;
+		*parcent = counterReq != 0 ? (CurrentCount >= counterReq ? 100 : CurrentCount * 100 / counterReq) : 0;
+	*remainingSec = CurrentCount < counterReq ? (counterReq - CurrentCount + 999U) / 1000U : 0;
 	return res;
 #endif // !ATM32F43_xx
 }

@@ -50,7 +50,7 @@ static usb_sts_type class_event_handler(void *udev, usbd_event_type event);
 
 static usb_sts_type cdc_struct_init(cdc_struct_type *pcdc);
 extern void usb_usart_config( linecoding_type linecoding);
-static void usb_vcp_cmd_process(void *udev, uint8_t cmd, uint8_t *buff, uint16_t len);
+static void usb_vcp_cmd_process(void *udev, uint8_t port, uint8_t cmd, uint8_t *buff, uint16_t len);
 
 linecoding_type linecoding =
 {
@@ -99,9 +99,13 @@ static usb_sts_type class_init_handler(void *udev)
 
   /* open out endpoint */
   usbd_ept_open(pudev, USBD_CDC_BULK_OUT_EPT, EPT_BULK_TYPE, USBD_CDC_OUT_MAXPACKET_SIZE);
+  usbd_ept_open(pudev, USBD_CDC2_INT_EPT, EPT_INT_TYPE, USBD_CDC_CMD_MAXPACKET_SIZE);
+  usbd_ept_open(pudev, USBD_CDC2_BULK_IN_EPT, EPT_BULK_TYPE, USBD_CDC_IN_MAXPACKET_SIZE);
+  usbd_ept_open(pudev, USBD_CDC2_BULK_OUT_EPT, EPT_BULK_TYPE, USBD_CDC_OUT_MAXPACKET_SIZE);
 
   /* set out endpoint to receive status */
-  usbd_ept_recv(pudev, USBD_CDC_BULK_OUT_EPT, pcdc->g_rx_buff, USBD_CDC_OUT_MAXPACKET_SIZE);
+  usbd_ept_recv(pudev, USBD_CDC_BULK_OUT_EPT, pcdc->g_rx_buff[0], USBD_CDC_OUT_MAXPACKET_SIZE);
+  usbd_ept_recv(pudev, USBD_CDC2_BULK_OUT_EPT, pcdc->g_rx_buff[1], USBD_CDC_OUT_MAXPACKET_SIZE);
 
   return status;
 }
@@ -124,6 +128,9 @@ static usb_sts_type class_clear_handler(void *udev)
 
   /* close out endpoint */
   usbd_ept_close(pudev, USBD_CDC_BULK_OUT_EPT);
+  usbd_ept_close(pudev, USBD_CDC2_INT_EPT);
+  usbd_ept_close(pudev, USBD_CDC2_BULK_IN_EPT);
+  usbd_ept_close(pudev, USBD_CDC2_BULK_OUT_EPT);
 
   return status;
 }
@@ -139,6 +146,8 @@ static usb_sts_type class_setup_handler(void *udev, usb_setup_type *setup)
   usb_sts_type status = USB_OK;
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
+  uint8_t port = (setup->wIndex >= 2U) ? 1U : 0U;
+  pcdc->control_port = port;
 
   switch(setup->bmRequestType & USB_REQ_TYPE_RESERVED)
   {
@@ -148,14 +157,14 @@ static usb_sts_type class_setup_handler(void *udev, usb_setup_type *setup)
       {
         if(setup->bmRequestType & USB_REQ_DIR_DTH)
         {
-          usb_vcp_cmd_process(udev, setup->bRequest, pcdc->g_cmd, setup->wLength);
-          usbd_ctrl_send(pudev, pcdc->g_cmd, setup->wLength);
+          usb_vcp_cmd_process(udev, port, setup->bRequest, pcdc->g_cmd[port], setup->wLength);
+          usbd_ctrl_send(pudev, pcdc->g_cmd[port], setup->wLength);
         }
         else
         {
-          pcdc->g_req = setup->bRequest;
-          pcdc->g_len = setup->wLength;
-          usbd_ctrl_recv(pudev, pcdc->g_cmd, pcdc->g_len);
+          pcdc->g_req[port] = setup->bRequest;
+          pcdc->g_len[port] = setup->wLength;
+          usbd_ctrl_recv(pudev, pcdc->g_cmd[port], pcdc->g_len[port]);
 
         }
       }
@@ -168,10 +177,10 @@ static usb_sts_type class_setup_handler(void *udev, usb_setup_type *setup)
           usbd_ctrl_unsupport(pudev);
           break;
         case USB_STD_REQ_GET_INTERFACE:
-          usbd_ctrl_send(pudev, (uint8_t *)&pcdc->alt_setting, 1);
+          usbd_ctrl_send(pudev, (uint8_t *)&pcdc->alt_setting[port], 1);
           break;
         case USB_STD_REQ_SET_INTERFACE:
-          pcdc->alt_setting = setup->wValue;
+          pcdc->alt_setting[port] = setup->wValue;
           break;
         case USB_STD_REQ_CLEAR_FEATURE:
           break;
@@ -214,11 +223,12 @@ static usb_sts_type class_ept0_rx_handler(void *udev)
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
   uint32_t recv_len = usbd_get_recv_len(pudev, 0);
+  uint8_t port = pcdc->control_port;
   /* ...user code... */
-  if( pcdc->g_req == SET_LINE_CODING)
+  if(pcdc->g_req[port] == SET_LINE_CODING)
   {
     /* class process */
-    usb_vcp_cmd_process(udev, pcdc->g_req, pcdc->g_cmd, recv_len);
+    usb_vcp_cmd_process(udev, port, pcdc->g_req[port], pcdc->g_cmd[port], recv_len);
   }
 
   return status;
@@ -240,7 +250,10 @@ static usb_sts_type class_in_handler(void *udev, uint8_t ept_num)
     trans next packet data
   */
   usbd_flush_tx_fifo(pudev, ept_num);
-  pcdc->g_tx_completed = 1;
+  if(ept_num == (USBD_CDC_BULK_IN_EPT & 0x7FU))
+    pcdc->g_tx_completed[0] = 1;
+  else if(ept_num == (USBD_CDC2_BULK_IN_EPT & 0x7FU))
+    pcdc->g_tx_completed[1] = 1;
 
   return status;
 }
@@ -258,10 +271,13 @@ static usb_sts_type class_out_handler(void *udev, uint8_t ept_num)
   cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
 
   /* get endpoint receive data length  */
-  pcdc->g_rxlen = usbd_get_recv_len(pudev, ept_num);
-
-  /*set recv flag*/
-  pcdc->g_rx_completed = 1;
+  if(ept_num == (USBD_CDC_BULK_OUT_EPT & 0x7FU)) {
+    pcdc->g_rxlen[0] = usbd_get_recv_len(pudev, ept_num);
+    pcdc->g_rx_completed[0] = 1;
+  } else if(ept_num == (USBD_CDC2_BULK_OUT_EPT & 0x7FU)) {
+    pcdc->g_rxlen[1] = usbd_get_recv_len(pudev, ept_num);
+    pcdc->g_rx_completed[1] = 1;
+  }
 
   return status;
 }
@@ -323,13 +339,14 @@ static usb_sts_type class_event_handler(void *udev, usbd_event_type event)
   */
 static usb_sts_type cdc_struct_init(cdc_struct_type *pcdc)
 {
-  pcdc->g_tx_completed = 1;
-  pcdc->g_rx_completed = 0;
-  pcdc->alt_setting = 0;
-  pcdc->linecoding.bitrate = linecoding.bitrate;
-  pcdc->linecoding.data = linecoding.data;
-  pcdc->linecoding.format = linecoding.format;
-  pcdc->linecoding.parity = linecoding.parity;
+  uint8_t port;
+  for(port = 0; port < 2U; port++) {
+    pcdc->g_tx_completed[port] = 1;
+    pcdc->g_rx_completed[port] = 0;
+    pcdc->alt_setting[port] = 0;
+    pcdc->linecoding[port] = linecoding;
+  }
+  pcdc->control_port = 0;
   return USB_OK;
 }
 
@@ -341,23 +358,33 @@ static usb_sts_type cdc_struct_init(cdc_struct_type *pcdc)
   */
 uint16_t usb_vcp_get_rxdata(void *udev, uint8_t *recv_data)
 {
+  return usb_vcp_get_rxdata_ch(udev, 1U, recv_data);
+}
+
+uint16_t usb_vcp_get_rxdata_ch(void *udev, uint8_t channel, uint8_t *recv_data)
+{
   uint16_t i_index = 0;
   uint16_t tmp_len = 0;
+  uint8_t port;
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
 
-  if(pcdc->g_rx_completed == 0)
+  if(channel < 1U || channel > 2U)
+    return 0;
+  port = (uint8_t)(channel - 1U);
+  if(pcdc->g_rx_completed[port] == 0)
   {
     return 0;
   }
-  pcdc->g_rx_completed = 0;
-  tmp_len = pcdc->g_rxlen;
-  for(i_index = 0; i_index < pcdc->g_rxlen; i_index ++)
+  pcdc->g_rx_completed[port] = 0;
+  tmp_len = pcdc->g_rxlen[port];
+  for(i_index = 0; i_index < pcdc->g_rxlen[port]; i_index ++)
   {
-    recv_data[i_index] = pcdc->g_rx_buff[i_index];
+    recv_data[i_index] = pcdc->g_rx_buff[port][i_index];
   }
 
-  usbd_ept_recv(pudev, USBD_CDC_BULK_OUT_EPT, pcdc->g_rx_buff, USBD_CDC_OUT_MAXPACKET_SIZE);
+  usbd_ept_recv(pudev, port ? USBD_CDC2_BULK_OUT_EPT : USBD_CDC_BULK_OUT_EPT,
+                pcdc->g_rx_buff[port], USBD_CDC_OUT_MAXPACKET_SIZE);
 
   return tmp_len;
 }
@@ -371,19 +398,37 @@ uint16_t usb_vcp_get_rxdata(void *udev, uint8_t *recv_data)
   */
 error_status usb_vcp_send_data(void *udev, uint8_t *send_data, uint16_t len)
 {
+  return usb_vcp_send_data_ch(udev, 1U, send_data, len);
+}
+
+error_status usb_vcp_send_data_ch(void *udev, uint8_t channel, uint8_t *send_data, uint16_t len)
+{
   error_status status = SUCCESS;
+  uint8_t port;
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
-  if(pcdc->g_tx_completed)
+  if(channel < 1U || channel > 2U || len > USBD_CDC_IN_MAXPACKET_SIZE)
+    return ERROR;
+  port = (uint8_t)(channel - 1U);
+  if(pcdc->g_tx_completed[port])
   {
-    pcdc->g_tx_completed = 0;
-    usbd_ept_send(pudev, USBD_CDC_BULK_IN_EPT, send_data, len);
+    pcdc->g_tx_completed[port] = 0;
+    usbd_ept_send(pudev, port ? USBD_CDC2_BULK_IN_EPT : USBD_CDC_BULK_IN_EPT, send_data, len);
   }
   else
   {
     status = ERROR;
   }
   return status;
+}
+
+uint8_t usb_vcp_tx_completed_ch(void *udev, uint8_t channel)
+{
+  usbd_core_type *pudev = (usbd_core_type *)udev;
+  cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
+  if(channel < 1U || channel > 2U)
+    return 0;
+  return pcdc->g_tx_completed[channel - 1U];
 }
 
 error_status usb_vcp_send_data_force(void *udev, uint8_t *send_data, uint16_t len)
@@ -397,7 +442,7 @@ error_status usb_vcp_send_data_force(void *udev, uint8_t *send_data, uint16_t le
   }
 
   /* The USB peripheral owns the bytes after they enter its FIFO. */
-  pcdc->g_tx_completed = 0;
+  pcdc->g_tx_completed[0] = 0;
   usbd_ept_send(pudev, USBD_CDC_BULK_IN_EPT, send_data, len);
   return SUCCESS;
 }
@@ -406,14 +451,14 @@ uint8_t usb_vcp_tx_completed(void *udev)
 {
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
-  return pcdc->g_tx_completed;
+  return pcdc->g_tx_completed[0];
 }
 
 uint8_t usb_vcp_rx_completed(void *udev)
 {
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
-  return pcdc->g_rx_completed;
+  return pcdc->g_rx_completed[0];
 }
 
 /**
@@ -424,32 +469,32 @@ uint8_t usb_vcp_rx_completed(void *udev)
   * @param  len: buffer length
   * @retval none
   */
-static void usb_vcp_cmd_process(void *udev, uint8_t cmd, uint8_t *buff, uint16_t len)
+static void usb_vcp_cmd_process(void *udev, uint8_t port, uint8_t cmd, uint8_t *buff, uint16_t len)
 {
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_struct_type *pcdc = (cdc_struct_type *)pudev->class_handler->pdata;
   switch(cmd)
   {
     case SET_LINE_CODING:
-      pcdc->linecoding.bitrate = (uint32_t)(buff[0] | (buff[1] << 8) | (buff[2] << 16) | (buff[3] <<24));
-      pcdc->linecoding.format = buff[4];
-      pcdc->linecoding.parity = buff[5];
-      pcdc->linecoding.data = buff[6];
+      pcdc->linecoding[port].bitrate = (uint32_t)(buff[0] | (buff[1] << 8) | (buff[2] << 16) | (buff[3] <<24));
+      pcdc->linecoding[port].format = buff[4];
+      pcdc->linecoding[port].parity = buff[5];
+      pcdc->linecoding[port].data = buff[6];
 #ifdef USB_VIRTUAL_COMPORT
       /* set hardware usart */
      extern void usart1_init(uint32_t bound);
-		usart1_init(pcdc->linecoding.bitrate);
+		if(port == 0U) usart1_init(pcdc->linecoding[port].bitrate);
 #endif
       break;
 
     case GET_LINE_CODING:
-      buff[0] = (uint8_t)pcdc->linecoding.bitrate;
-      buff[1] = (uint8_t)(pcdc->linecoding.bitrate >> 8);
-      buff[2] = (uint8_t)(pcdc->linecoding.bitrate >> 16);
-      buff[3] = (uint8_t)(pcdc->linecoding.bitrate >> 24);
-      buff[4] = (uint8_t)(pcdc->linecoding.format);
-      buff[5] = (uint8_t)(pcdc->linecoding.parity);
-      buff[6] = (uint8_t)(pcdc->linecoding.data);
+      buff[0] = (uint8_t)pcdc->linecoding[port].bitrate;
+      buff[1] = (uint8_t)(pcdc->linecoding[port].bitrate >> 8);
+      buff[2] = (uint8_t)(pcdc->linecoding[port].bitrate >> 16);
+      buff[3] = (uint8_t)(pcdc->linecoding[port].bitrate >> 24);
+      buff[4] = (uint8_t)(pcdc->linecoding[port].format);
+      buff[5] = (uint8_t)(pcdc->linecoding[port].parity);
+      buff[6] = (uint8_t)(pcdc->linecoding[port].data);
       break;
 
     default:

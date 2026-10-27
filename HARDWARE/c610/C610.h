@@ -51,4 +51,7 @@ typedef struct
     int16_t isread;
 } motor_measure_t;
 
+/* CAN motor 1 feedback: single-turn encoder angle in degrees and speed in rpm. */
+int C610_Get_Feedback(float *angle_deg, float *speed_rpm);
+
 #endif
